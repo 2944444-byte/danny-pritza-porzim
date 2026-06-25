@@ -11,7 +11,14 @@
 
 import { requestJson, requestBlob, type BlobResult } from './client';
 import { ENDPOINTS } from '../config/appConfig';
-import type { Availability, BackendRow, EmailParams, SchemaMeta, Schedule } from '../types';
+import type {
+  Availability,
+  BackendRow,
+  EmailParams,
+  SchemaMeta,
+  Schedule,
+  UploadResult,
+} from '../types';
 
 /**
  * Fetch dropdown configuration (e.g. the list of valid office names).
@@ -37,17 +44,22 @@ export function validateTable(rows: BackendRow[]): Promise<unknown> {
  * Upload an Excel file to be parsed into rows.
  * Backend: POST /upload-excel (multipart, field "file") → { "data": [ {row}, ... ] }
  */
-export async function uploadExcel(file: File): Promise<Array<Record<string, unknown>>> {
+export async function uploadExcel(file: File): Promise<UploadResult> {
   const formData = new FormData();
   formData.append('file', file);
   const result = await requestJson<unknown>(ENDPOINTS.uploadExcel, {
     method: 'POST',
     body: formData,
   });
-  // Backend returns { data: [...] }; tolerate a bare array too.
-  if (Array.isArray(result)) return result as Array<Record<string, unknown>>;
-  const data = (result as { data?: unknown })?.data;
-  return Array.isArray(data) ? (data as Array<Record<string, unknown>>) : [];
+  // Backend returns { data: [...], columns: [...] }; tolerate a bare array too.
+  if (Array.isArray(result)) {
+    return { rows: result as Array<Record<string, unknown>>, columns: [] };
+  }
+  const obj = (result ?? {}) as { data?: unknown; columns?: unknown };
+  return {
+    rows: Array.isArray(obj.data) ? (obj.data as Array<Record<string, unknown>>) : [],
+    columns: Array.isArray(obj.columns) ? (obj.columns as string[]) : [],
+  };
 }
 
 /**
@@ -112,4 +124,22 @@ export function saveSchedule(schedule: Schedule, adminToken?: string): Promise<S
     body: JSON.stringify(schedule),
     headers: adminToken ? { 'X-Admin-Token': adminToken } : undefined,
   });
+}
+
+/** Load the admin-editable list of valid office names. GET /admin/offices */
+export async function fetchOffices(): Promise<string[]> {
+  const result = await requestJson<{ offices?: unknown }>(ENDPOINTS.adminOffices, {
+    method: 'GET',
+  });
+  return Array.isArray(result.offices) ? (result.offices as string[]) : [];
+}
+
+/** Replace the offices dropdown list (admin). PUT /admin/offices */
+export async function saveOffices(offices: string[], adminToken?: string): Promise<string[]> {
+  const result = await requestJson<{ offices?: unknown }>(ENDPOINTS.adminOffices, {
+    method: 'PUT',
+    body: JSON.stringify({ offices }),
+    headers: adminToken ? { 'X-Admin-Token': adminToken } : undefined,
+  });
+  return Array.isArray(result.offices) ? (result.offices as string[]) : [];
 }

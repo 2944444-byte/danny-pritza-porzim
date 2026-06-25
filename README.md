@@ -17,6 +17,9 @@ For each phone number you record:
 ## Features
 
 - **Upload Excel** – parse an `.xlsx`/`.xls` file into the grid (`/upload-excel`).
+  If the file's **columns don't match** the schema, the upload is rejected with a
+  clear message listing the expected columns. If the columns match but **values**
+  are bad, the rows load and simply fail validation (red cells).
 - **Add row / Delete row** – edit the table manually.
 - **Download template** – get a correctly-formatted starter sheet (`/download-template`).
 - **Validate data** – the backend checks every cell (`/validate-table`).
@@ -43,9 +46,12 @@ message `אנחנו סגורים בשבת, נסו מאוחר יותר`.
   when the site is closed — so the rule holds even outside the UI.
 - The frontend polls `GET /availability` and shows the closed page when shut.
   The admin page stays reachable while closed, so you can always re-open.
+- **Office dropdown options:** the admin page also edits the list of offices
+  (add/remove/rename). Saving updates the `Office Name` dropdown *and* what counts
+  as a valid office during validation.
 - **Locking the admin page:** set `ADMIN_TOKEN` on the backend; saving the
-  schedule then requires that token (entered once on the admin page). Without it,
-  saving is open (handy for local/dev).
+  schedule or offices then requires that token (entered once on the admin page).
+  Without it, saving is open (handy for local/dev).
 
 ## The core rule: validate before export
 

@@ -25,21 +25,30 @@ from src.columns.column_types import (
     TextColumn,
     WKTGeometryColumn,
 )
-from src.consts.consts import OFFICE_NAMES
+from src.services import offices_service
 
 
 class TableSchemaManager:
     """Owns the ordered list of columns and runs validation over table rows."""
 
     def __init__(self) -> None:
+        # Keep a reference to the office column so its allowed values can be kept
+        # in sync with the admin-editable offices list.
+        self.office_column = DropdownColumn(
+            "office_name", "Office Name", allowed_values=offices_service.load_offices()
+        )
         # The schema: order here is the canonical column order.
         self.columns: List[BaseColumn] = [
             PhoneColumn("phone_number", "Phone Number"),
-            DropdownColumn("office_name", "Office Name", allowed_values=OFFICE_NAMES),
+            self.office_column,
             WKTGeometryColumn("geographic_location", "Geographic Location (WKT)"),
             TextColumn("department_name", "Department Name"),
             IntegerColumn("importance", "Importance"),
         ]
+
+    def _sync_offices(self) -> None:
+        """Refresh the office dropdown's allowed values from the offices store."""
+        self.office_column.allowed_values = offices_service.load_offices()
 
     # -- Schema metadata ------------------------------------------------------
 
@@ -48,6 +57,7 @@ class TableSchemaManager:
         Return { column_name: [allowed values] } for every dropdown column.
         Consumed by the UI to populate <select> inputs.
         """
+        self._sync_offices()
         return {
             col.name: col.allowed_values
             for col in self.columns
@@ -68,6 +78,7 @@ class TableSchemaManager:
 
         The front-end's validationAdapter understands this shape directly.
         """
+        self._sync_offices()
         errors: List[Dict[str, Any]] = []
 
         for row_index, row in enumerate(table_data or []):

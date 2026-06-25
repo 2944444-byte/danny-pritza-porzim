@@ -11,7 +11,13 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { fetchSchedule, fetchAvailability, saveSchedule } from '../api/phoneMappingApi';
+import {
+  fetchSchedule,
+  fetchAvailability,
+  saveSchedule,
+  fetchOffices,
+  saveOffices,
+} from '../api/phoneMappingApi';
 import { ToastStack } from '../components/Toast';
 import { useToasts } from '../hooks/useToasts';
 import type { Availability, DaySchedule, Schedule } from '../types';
@@ -24,23 +30,30 @@ export default function AdminPage() {
   const { toasts, notify, dismiss } = useToasts();
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [availability, setAvailability] = useState<Availability | null>(null);
+  const [offices, setOffices] = useState<string[]>([]);
   const [adminToken, setAdminToken] = useState<string>(
     () => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '',
   );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingOffices, setSavingOffices] = useState(false);
 
-  // Load the schedule + current status on mount.
+  // Load the schedule, offices and current status on mount.
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [sched, avail] = await Promise.all([fetchSchedule(), fetchAvailability()]);
+        const [sched, avail, offs] = await Promise.all([
+          fetchSchedule(),
+          fetchAvailability(),
+          fetchOffices(),
+        ]);
         if (!active) return;
         setSchedule(sched);
         setAvailability(avail);
+        setOffices(offs);
       } catch (e) {
-        notify(e instanceof Error ? e.message : 'Failed to load schedule.', 'error', 7000);
+        notify(e instanceof Error ? e.message : 'Failed to load admin settings.', 'error', 7000);
       } finally {
         if (active) setLoading(false);
       }
@@ -49,6 +62,30 @@ export default function AdminPage() {
       active = false;
     };
   }, [notify]);
+
+  // --- Offices editor ---
+  const updateOffice = (index: number, value: string) =>
+    setOffices((prev) => prev.map((o, i) => (i === index ? value : o)));
+  const addOffice = () => setOffices((prev) => [...prev, '']);
+  const removeOffice = (index: number) =>
+    setOffices((prev) => prev.filter((_, i) => i !== index));
+
+  const persistToken = () => localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
+
+  const handleSaveOffices = async () => {
+    setSavingOffices(true);
+    try {
+      const cleaned = offices.map((o) => o.trim()).filter(Boolean);
+      const saved = await saveOffices(cleaned, adminToken || undefined);
+      persistToken();
+      setOffices(saved);
+      notify('Offices saved.', 'success');
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to save offices.', 'error', 7000);
+    } finally {
+      setSavingOffices(false);
+    }
+  };
 
   const updateDay = (dayKey: string, patch: Partial<DaySchedule>) => {
     setSchedule((prev) =>
@@ -210,6 +247,51 @@ export default function AdminPage() {
               {saving ? 'Saving…' : 'Save schedule'}
             </button>
           </div>
+
+          <section className="admin-section">
+            <h2 className="admin-section__title">Office dropdown options</h2>
+            <p className="app__subtitle">
+              The list of offices users can choose for “Office Name”. Saving updates the dropdown
+              and what counts as a valid office during validation.
+            </p>
+
+            <div className="offices-list">
+              {offices.map((office, index) => (
+                <div className="office-row" key={index}>
+                  <input
+                    type="text"
+                    className="form__input"
+                    value={office}
+                    onChange={(e) => updateOffice(index, e.target.value)}
+                    placeholder="Office name"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn--danger btn--icon"
+                    onClick={() => removeOffice(index)}
+                    aria-label={`Remove office ${index + 1}`}
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="offices-actions">
+              <button type="button" className="btn" onClick={addOffice}>
+                ＋ Add office
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleSaveOffices}
+                disabled={savingOffices}
+              >
+                {savingOffices ? 'Saving…' : 'Save offices'}
+              </button>
+            </div>
+          </section>
         </>
       )}
 

@@ -24,6 +24,8 @@ import { useSchemaMeta } from './hooks/useSchemaMeta';
 import { uploadExcel, downloadTemplate as apiDownloadTemplate } from './api/phoneMappingApi';
 import { saveBlob } from './utils/download';
 import { toExcelFilename } from './utils/filename';
+import { inspectUploadColumns } from './utils/uploadNormalizer';
+import { COLUMNS } from './config/columns';
 import { DEFAULT_TEMPLATE_FILENAME } from './config/appConfig';
 import type { EmailParams } from './types';
 
@@ -64,9 +66,27 @@ export default function App() {
   const handleUpload = useCallback(
     (file: File) =>
       runAction(async () => {
-        const rawRows = await uploadExcel(file);
+        const { rows: rawRows, columns } = await uploadExcel(file);
+
+        // Reject files whose columns don't match the expected schema, with an
+        // explanation. (Cell *values* are NOT checked here — a file with the
+        // right columns but bad values still imports and fails validation.)
+        const { missing, unknownHeaders } = inspectUploadColumns(rawRows, columns);
+        if (missing.length > 0) {
+          const expected = COLUMNS.map((c) => c.label).join(', ');
+          const miss = missing.map((c) => c.label).join(', ');
+          throw new Error(
+            `Upload failed — the file's columns don't match. ` +
+              `Missing required column(s): ${miss}. Expected columns: ${expected}.`,
+          );
+        }
+
         table.loadUploadedRows(rawRows);
-        notify(`Loaded ${rawRows.length} row(s) from “${file.name}”. Please validate.`, 'success');
+        let msg = `Loaded ${rawRows.length} row(s) from “${file.name}”. Please validate.`;
+        if (unknownHeaders.length > 0) {
+          msg += ` (Ignored unrecognized column(s): ${unknownHeaders.join(', ')}.)`;
+        }
+        notify(msg, 'success');
       }),
     [runAction, table, notify],
   );

@@ -17,22 +17,26 @@ import openpyxl
 from src.tables.table_handler import TableSchemaManager
 
 
-def read_rows(contents: bytes) -> List[Dict[str, Any]]:
+def read_sheet(contents: bytes) -> tuple[List[str], List[Dict[str, Any]]]:
     """
-    Parse the bytes of an .xlsx file into a list of {header: value} dicts, using
-    the first row as the header. Empty cells become "" and fully-empty rows are
-    skipped. Headers are returned as-is (the caller normalizes them).
+    Parse the bytes of an .xlsx file into (headers, records):
+      - headers: the first row's column names (as-is; caller normalizes).
+      - records: one {header: value} dict per data row; empty cells become ""
+        and fully-empty rows are skipped.
+
+    Returning headers separately lets callers detect column-name mismatches even
+    when the sheet has headers but no data rows.
     """
     wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
-        return []
+        return [], []
 
     rows_iter = ws.iter_rows(values_only=True)
     try:
         header_row = next(rows_iter)
     except StopIteration:
-        return []
+        return [], []
 
     headers = ["" if h is None else str(h) for h in header_row]
 
@@ -45,7 +49,7 @@ def read_rows(contents: bytes) -> List[Dict[str, Any]]:
             value = row[i] if i < len(row) else None
             record[header] = "" if value is None else value
         records.append(record)
-    return records
+    return headers, records
 
 
 import re

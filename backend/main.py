@@ -28,9 +28,10 @@ from pydantic import BaseModel, field_validator
 from urllib.parse import quote
 
 from src.tables.table_handler import TableSchemaManager
-from src.services.excel_service import build_workbook_bytes, read_rows, safe_filename
+from src.services.excel_service import build_workbook_bytes, read_sheet, safe_filename
 from src.services.email_service import send_report, EXCEL_MIME
 from src.services import schedule_service
+from src.services import offices_service
 
 
 def _attachment_disposition(filename: str) -> str:
@@ -92,6 +93,16 @@ class ScheduleUpdate(BaseModel):
         return days
 
 
+class OfficesUpdate(BaseModel):
+    offices: List[str]
+
+
+def require_admin(x_admin_token: str | None) -> None:
+    """Enforce the admin token on write endpoints when one is configured."""
+    if schedule_service.ADMIN_TOKEN and x_admin_token != schedule_service.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin token.")
+
+
 # --- Availability gate --------------------------------------------------------
 
 
@@ -123,10 +134,22 @@ def update_schedule(schedule: ScheduleUpdate, x_admin_token: str | None = Header
     Replace the weekly schedule. If an ADMIN_TOKEN is configured on the server,
     the matching `X-Admin-Token` header is required.
     """
-    if schedule_service.ADMIN_TOKEN and x_admin_token != schedule_service.ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid or missing admin token.")
+    require_admin(x_admin_token)
     saved = schedule_service.save_schedule(schedule.model_dump())
     return saved
+
+
+@app.get("/admin/offices")
+def get_offices():
+    """Return the admin-editable list of valid office names."""
+    return {"offices": offices_service.load_offices()}
+
+
+@app.put("/admin/offices")
+def update_offices(payload: OfficesUpdate, x_admin_token: str | None = Header(default=None)):
+    """Replace the offices dropdown list (admin)."""
+    require_admin(x_admin_token)
+    return {"offices": offices_service.save_offices(payload.offices)}
 
 
 @app.get("/schema-meta")
@@ -150,17 +173,21 @@ async def upload_excel(file: UploadFile = File(...)):
 
     try:
         contents = await file.read()
-        records = read_rows(contents)
-
-        # Clean header keys to match canonical column keys (same rule the
-        # template/headers follow): lowercase, trimmed, spaces → underscores.
-        cleaned = [
-            {str(k).strip().lower().replace(" ", "_"): v for k, v in record.items()}
-            for record in records
-        ]
-        return {"data": cleaned}
+        headers, records = read_sheet(contents)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Parsing error: {str(e)}")
+
+    def clean(key: str) -> str:
+        return str(key).strip().lower().replace(" ", "_")
+
+    # Clean header keys to match canonical column keys (same rule the
+    # template/headers follow): lowercase, trimmed, spaces → underscores.
+    # `columns` is returned so the UI can flag column-name mismatches even when
+    # the sheet has no data rows.
+    return {
+        "columns": [clean(h) for h in headers],
+        "data": [{clean(k): v for k, v in record.items()} for record in records],
+    }
 
 
 @app.get("/download-template")

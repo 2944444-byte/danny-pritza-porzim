@@ -29,6 +29,7 @@ export const ENDPOINTS = {
   sendEmail: '/send-email',
   availability: '/availability',
   adminSchedule: '/admin/schedule',
+  adminOffices: '/admin/offices',
 } as const;
 
 /** Default filenames used when the server does not provide a Content-Disposition. */

@@ -86,6 +86,14 @@ export interface Schedule {
   days: Record<string, DaySchedule>;
 }
 
+/** Result of parsing an uploaded spreadsheet (POST /upload-excel). */
+export interface UploadResult {
+  /** One object per data row, keyed by the (cleaned) uploaded headers. */
+  rows: Array<Record<string, unknown>>;
+  /** The (cleaned) header names found in the sheet — used for column checks. */
+  columns: string[];
+}
+
 /** Current open/closed status returned by GET /availability. */
 export interface Availability {
   open: boolean;

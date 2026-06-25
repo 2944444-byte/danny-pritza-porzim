@@ -12,7 +12,7 @@
 
 import { COLUMNS } from '../config/columns';
 import { toGridRow } from './rowFactory';
-import type { GridRow } from '../types';
+import type { ColumnDef, GridRow } from '../types';
 
 /** Apply the same normalization the backend applies to a header string. */
 function cleanHeader(header: string): string {
@@ -44,4 +44,46 @@ export function normalizeUploadedRows(rawRows: Array<Record<string, unknown>>): 
     }
     return toGridRow(remapped);
   });
+}
+
+export interface UploadColumnCheck {
+  /** Required columns that the uploaded sheet does not provide. */
+  missing: ColumnDef[];
+  /** Uploaded headers that don't map to any known column (ignored on import). */
+  unknownHeaders: string[];
+}
+
+/**
+ * Check whether an uploaded sheet's columns match our schema.
+ *
+ * `columns` are the (cleaned) headers reported by the backend; if absent we fall
+ * back to the keys present on the data rows. A header matches a column when it
+ * equals the column's key, label, or one of its aliases (after cleaning).
+ *
+ * This only checks *column names* — cell values are NOT inspected here, so a
+ * sheet with the right columns but bad values still imports and is caught later
+ * by validation.
+ */
+export function inspectUploadColumns(
+  rawRows: Array<Record<string, unknown>>,
+  columns: string[] = [],
+): UploadColumnCheck {
+  const headerKeys = new Set<string>();
+  for (const c of columns) headerKeys.add(cleanHeader(c));
+  if (headerKeys.size === 0) {
+    // No header list supplied → derive from the data rows' keys.
+    for (const row of rawRows ?? []) {
+      for (const key of Object.keys(row ?? {})) headerKeys.add(cleanHeader(key));
+    }
+  }
+
+  const recognized = new Set<string>();
+  for (const key of headerKeys) {
+    const canonical = ALIAS_TO_KEY[key];
+    if (canonical) recognized.add(canonical);
+  }
+
+  const missing = COLUMNS.filter((c) => c.required && !recognized.has(c.key));
+  const unknownHeaders = [...headerKeys].filter((k) => k && !ALIAS_TO_KEY[k]);
+  return { missing, unknownHeaders };
 }

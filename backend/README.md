@@ -32,6 +32,13 @@ API docs (Swagger UI): http://localhost:8000/docs
 | GET  | `/availability` | Current open/closed status + closed message. |
 | GET  | `/admin/schedule` | The weekly availability schedule. |
 | PUT  | `/admin/schedule` | Update the schedule (admin). |
+| GET  | `/admin/offices` | The editable list of valid office names. |
+| PUT  | `/admin/offices` | Replace the offices list (admin). |
+
+`/upload-excel` returns `{ columns, data }` so the UI can flag column-name
+mismatches. Offices are persisted (`offices_service`, `OFFICES_PATH`) and the
+schema manager re-reads them on every `/schema-meta` and `/validate-table`, so
+admin changes take effect immediately.
 
 ## Availability schedule
 
