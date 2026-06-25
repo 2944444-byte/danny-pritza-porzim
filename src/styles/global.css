@@ -530,3 +530,122 @@ select.cell-input {
   white-space: nowrap;
   border: 0;
 }
+
+/* ----------------------------------------------------- Admin link & header */
+
+.admin-link {
+  align-self: flex-start;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- Closed page */
+
+.closed-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  background: linear-gradient(160deg, #1f2733 0%, #2f3b4c 100%);
+  color: #fff;
+}
+
+.closed-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 40px 44px;
+  max-width: 520px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.closed-icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.closed-message {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.closed-admin-link {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.closed-admin-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.centered-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+}
+
+/* --------------------------------------------------------------- Admin page */
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  margin-bottom: 18px;
+}
+
+.schedule-table th,
+.schedule-table td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.schedule-table th {
+  background: #eef2f9;
+  font-size: 0.82rem;
+  color: #41506a;
+}
+
+.schedule-row--off {
+  color: var(--color-muted);
+  background: #fafbfe;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.admin-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.form__hint {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.admin-actions {
+  display: flex;
+  justify-content: flex-end;
+}

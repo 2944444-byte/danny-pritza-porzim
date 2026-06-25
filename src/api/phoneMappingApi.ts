@@ -11,7 +11,7 @@
 
 import { requestJson, requestBlob, type BlobResult } from './client';
 import { ENDPOINTS } from '../config/appConfig';
-import type { BackendRow, EmailParams, SchemaMeta } from '../types';
+import type { Availability, BackendRow, EmailParams, SchemaMeta, Schedule } from '../types';
 
 /**
  * Fetch dropdown configuration (e.g. the list of valid office names).
@@ -81,5 +81,34 @@ export function sendEmailReport(
   return requestJson<unknown>(ENDPOINTS.sendEmail, {
     method: 'POST',
     body: JSON.stringify({ recipient, data: rows, subject, message }),
+  });
+}
+
+/**
+ * Current open/closed status (and the closed message).
+ * Backend: GET /availability
+ */
+export function fetchAvailability(): Promise<Availability> {
+  return requestJson<Availability>(ENDPOINTS.availability, { method: 'GET' });
+}
+
+/**
+ * Load the full weekly schedule (admin page).
+ * Backend: GET /admin/schedule
+ */
+export function fetchSchedule(): Promise<Schedule> {
+  return requestJson<Schedule>(ENDPOINTS.adminSchedule, { method: 'GET' });
+}
+
+/**
+ * Save the weekly schedule (admin page). When the server has an ADMIN_TOKEN
+ * configured, `adminToken` is sent as the `X-Admin-Token` header.
+ * Backend: PUT /admin/schedule
+ */
+export function saveSchedule(schedule: Schedule, adminToken?: string): Promise<Schedule> {
+  return requestJson<Schedule>(ENDPOINTS.adminSchedule, {
+    method: 'PUT',
+    body: JSON.stringify(schedule),
+    headers: adminToken ? { 'X-Admin-Token': adminToken } : undefined,
   });
 }

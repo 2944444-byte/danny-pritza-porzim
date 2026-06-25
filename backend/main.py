@@ -21,13 +21,14 @@ import io
 from typing import Any, Dict, List
 
 import openpyxl
-from fastapi import FastAPI, File, HTTPException, Response, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src.tables.table_handler import TableSchemaManager
 from src.services.excel_service import build_workbook_bytes, read_rows
 from src.services.email_service import send_report, EXCEL_MIME
+from src.services import schedule_service
 
 app = FastAPI(title="Phone Mapping API")
 
@@ -52,7 +53,71 @@ class EmailRequest(BaseModel):
     message: str | None = ""
 
 
+class DaySchedule(BaseModel):
+    enabled: bool
+    open: str
+    close: str
+
+    @field_validator("open", "close")
+    @classmethod
+    def _valid_time(cls, v: str) -> str:
+        try:
+            hours, minutes = v.split(":")
+            assert 0 <= int(hours) <= 23 and 0 <= int(minutes) <= 59
+        except Exception:
+            raise ValueError("Time must be in HH:MM (24h) format.")
+        return v
+
+
+class ScheduleUpdate(BaseModel):
+    timezone: str = "Asia/Jerusalem"
+    closed_message: str
+    days: Dict[str, DaySchedule]
+
+    @field_validator("days")
+    @classmethod
+    def _seven_days(cls, days: Dict[str, "DaySchedule"]) -> Dict[str, "DaySchedule"]:
+        missing = [str(i) for i in range(7) if str(i) not in days]
+        if missing:
+            raise ValueError(f"Schedule must define all days 0-6; missing {missing}.")
+        return days
+
+
+# --- Availability gate --------------------------------------------------------
+
+
+def ensure_open() -> None:
+    """Raise 403 with a (Hebrew) message when the site is currently closed."""
+    status = schedule_service.evaluate()
+    if not status["open"]:
+        raise HTTPException(status_code=403, detail=status["message"])
+
+
 # --- API Endpoints ------------------------------------------------------------
+
+
+@app.get("/availability")
+def get_availability():
+    """Current open/closed status + the message to show when closed."""
+    return schedule_service.evaluate()
+
+
+@app.get("/admin/schedule")
+def get_schedule():
+    """Return the full weekly schedule (for the admin page)."""
+    return schedule_service.load_schedule()
+
+
+@app.put("/admin/schedule")
+def update_schedule(schedule: ScheduleUpdate, x_admin_token: str | None = Header(default=None)):
+    """
+    Replace the weekly schedule. If an ADMIN_TOKEN is configured on the server,
+    the matching `X-Admin-Token` header is required.
+    """
+    if schedule_service.ADMIN_TOKEN and x_admin_token != schedule_service.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin token.")
+    saved = schedule_service.save_schedule(schedule.model_dump())
+    return saved
 
 
 @app.get("/schema-meta")
@@ -63,6 +128,9 @@ def get_schema_meta():
 
 @app.post("/validate-table")
 def validate_table(table_data: List[Dict[str, Any]]):
+    # Validation (and therefore export/email) is only available while the site
+    # is open per the admin schedule.
+    ensure_open()
     return schema_manager.validate_table(table_data)
 
 
@@ -125,6 +193,7 @@ def download_excel(table_data: List[Dict[str, Any]]):
     Export the rows as an .xlsx file. Re-validates server-side and refuses to
     export invalid data, mirroring the UI's "validate before export" rule.
     """
+    ensure_open()
     result = schema_manager.validate_table(table_data)
     if not result["is_valid"]:
         raise HTTPException(
@@ -145,6 +214,7 @@ def send_email(req: EmailRequest):
     """
     Email the validated rows as an .xlsx report. Re-validates server-side first.
     """
+    ensure_open()
     result = schema_manager.validate_table(req.data)
     if not result["is_valid"]:
         raise HTTPException(

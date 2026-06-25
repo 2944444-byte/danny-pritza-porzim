@@ -136,6 +136,9 @@ export default function App() {
             export, or email the report.
           </p>
         </div>
+        <a className="btn admin-link" href="#/admin" title="Site availability settings">
+          ⚙ Admin
+        </a>
       </header>
 
       {schemaError && (

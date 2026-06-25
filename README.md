@@ -24,6 +24,25 @@ For each phone number you record:
   hovering shows the **exact error message returned by the API** to help fix them.
 - **Download Excel / Send Email report** – both are **locked until validation
   passes**. Any edit re-locks them until you validate again.
+- **Admin availability schedule** – an admin page (`#/admin`) controls which
+  **days** and **hours** the site is reachable. Outside those times users get a
+  closed page and validation is disabled (enforced server-side too).
+
+## Admin: site availability schedule
+
+Open `#/admin` (or click **⚙ Admin** in the header). For each weekday you set
+*open?* + an open/close window; you can also set the timezone and the (Hebrew,
+RTL) message users see while closed. Saturday is closed by default with the
+message `אנחנו סגורים בשבת, נסו מאוחר יותר`.
+
+- The schedule is owned by the backend and enforced there: `/validate-table`
+  (and `/download-excel`, `/send-email`) return **403** with the closed message
+  when the site is closed — so the rule holds even outside the UI.
+- The frontend polls `GET /availability` and shows the closed page when shut.
+  The admin page stays reachable while closed, so you can always re-open.
+- **Locking the admin page:** set `ADMIN_TOKEN` on the backend; saving the
+  schedule then requires that token (entered once on the admin page). Without it,
+  saving is open (handy for local/dev).
 
 ## The core rule: validate before export
 

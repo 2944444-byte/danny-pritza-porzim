@@ -27,6 +27,8 @@ export const ENDPOINTS = {
   downloadTemplate: '/download-template',
   downloadExcel: '/download-excel',
   sendEmail: '/send-email',
+  availability: '/availability',
+  adminSchedule: '/admin/schedule',
 } as const;
 
 /** Default filenames used when the server does not provide a Content-Disposition. */

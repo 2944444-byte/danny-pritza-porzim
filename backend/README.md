@@ -29,6 +29,20 @@ API docs (Swagger UI): http://localhost:8000/docs
 | GET  | `/download-template` | Blank template `.xlsx`. |
 | POST | `/download-excel` | Export validated rows as `.xlsx` (re-validates first). |
 | POST | `/send-email` | Email the report (re-validates first). |
+| GET  | `/availability` | Current open/closed status + closed message. |
+| GET  | `/admin/schedule` | The weekly availability schedule. |
+| PUT  | `/admin/schedule` | Update the schedule (admin). |
+
+## Availability schedule
+
+A weekly schedule (`src/services/schedule_service.py`) decides when the site is
+open. While closed, `/validate-table`, `/download-excel` and `/send-email`
+return **403** with a (Hebrew) message. Days are keyed `"0"`..`"6"` (0 = Sunday
+… 6 = Saturday); Saturday is closed by default. Time is evaluated in the
+schedule's `timezone` (default `Asia/Jerusalem`). The schedule persists to
+`backend/data/schedule.json` (override with `SCHEDULE_PATH`).
+
+Set `ADMIN_TOKEN` to require the `X-Admin-Token` header on `PUT /admin/schedule`.
 
 ## Schema
 

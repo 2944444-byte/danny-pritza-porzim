@@ -68,3 +68,34 @@ export interface EmailParams {
   subject?: string;
   message?: string;
 }
+
+/** Per-day availability window. `open`/`close` are "HH:MM" (24h). */
+export interface DaySchedule {
+  enabled: boolean;
+  open: string;
+  close: string;
+}
+
+/**
+ * Weekly availability schedule. `days` is keyed "0".."6" where 0 = Sunday …
+ * 6 = Saturday (Israel/Hebrew week order).
+ */
+export interface Schedule {
+  timezone: string;
+  closed_message: string;
+  days: Record<string, DaySchedule>;
+}
+
+/** Current open/closed status returned by GET /availability. */
+export interface Availability {
+  open: boolean;
+  /** Why it's closed: 'day' (whole day off) or 'hours' (outside window). */
+  reason: 'day' | 'hours' | null;
+  /** Hebrew message to show on the closed page (null when open). */
+  message: string | null;
+  /** Server time (ISO) used for the decision. */
+  now: string;
+  /** 0 = Sunday … 6 = Saturday. */
+  weekday: number;
+  today: DaySchedule;
+}
