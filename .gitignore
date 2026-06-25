@@ -26,3 +26,9 @@ pnpm-debug.log*
 *.ntvs*
 *.njsproj
 *.sln
+
+# Python backend
+__pycache__/
+*.pyc
+backend/.venv/
+backend/venv/

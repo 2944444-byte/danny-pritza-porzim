@@ -34,7 +34,20 @@ enforced centrally in [`src/hooks/usePhoneTable.js`](src/hooks/usePhoneTable.js)
   to `unvalidated`, disabling export until the user re-validates.
 - Export actions also re-check the status defensively before calling the API.
 
-## Getting started
+## Run the full stack (frontend + backend)
+
+The backend lives in [`backend/`](backend) (FastAPI). The quickest way to run
+both together:
+
+```bash
+./run-dev.sh          # backend on :8000, frontend on :5173
+```
+
+…or run them in two terminals (see [`backend/README.md`](backend/README.md) for
+backend details). The frontend defaults to `http://localhost:8000`, so no extra
+config is needed locally.
+
+## Getting started (frontend only)
 
 ```bash
 # 1. Install dependencies
