@@ -1,20 +1,25 @@
 /**
- * useSchemaMeta.js
+ * useSchemaMeta.ts
  * -----------------------------------------------------------------------------
  * Loads dropdown options from `/schema-meta` once on mount and exposes them,
  * along with loading/error state and a `reload` function.
- *
- * Returns the raw map (e.g. { office_name: [...] }) so EditableCell can look up
- * options by a column's `dropdownKey`.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { fetchSchemaMeta } from '../api/phoneMappingApi.js';
+import { fetchSchemaMeta } from '../api/phoneMappingApi';
+import type { SchemaMeta } from '../types';
 
-export function useSchemaMeta() {
-  const [options, setOptions] = useState(/** @type {Record<string,string[]>} */ ({}));
+export interface UseSchemaMetaResult {
+  options: SchemaMeta;
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+}
+
+export function useSchemaMeta(): UseSchemaMetaResult {
+  const [options, setOptions] = useState<SchemaMeta>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(/** @type {string|null} */ (null));
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -23,7 +28,7 @@ export function useSchemaMeta() {
       const data = await fetchSchemaMeta();
       setOptions(data && typeof data === 'object' ? data : {});
     } catch (e) {
-      setError(e?.message ?? 'Failed to load dropdown options.');
+      setError(e instanceof Error ? e.message : 'Failed to load dropdown options.');
       setOptions({});
     } finally {
       setLoading(false);
@@ -31,7 +36,7 @@ export function useSchemaMeta() {
   }, []);
 
   useEffect(() => {
-    reload();
+    void reload();
   }, [reload]);
 
   return { options, loading, error, reload };

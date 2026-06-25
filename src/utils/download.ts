@@ -1,15 +1,11 @@
 /**
- * download.js
+ * download.ts
  * -----------------------------------------------------------------------------
  * Trigger a browser "Save As" for a Blob received from the API. Keeps the
  * object-URL lifecycle (create → click → revoke) in one place.
  */
 
-/**
- * @param {Blob} blob
- * @param {string} filename  Fallback filename if the server didn't supply one.
- */
-export function saveBlob(blob, filename) {
+export function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;

@@ -5,6 +5,9 @@ node_modules/
 dist/
 dist-ssr/
 
+# TypeScript incremental build info
+*.tsbuildinfo
+
 # Local env files (keep .env.example tracked)
 .env
 .env.local

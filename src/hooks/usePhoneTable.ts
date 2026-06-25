@@ -1,5 +1,5 @@
 /**
- * usePhoneTable.js
+ * usePhoneTable.ts
  * -----------------------------------------------------------------------------
  * The heart of the app: a small state machine that owns the table rows, the
  * per-cell validation errors, and the validation lifecycle. It enforces the
@@ -8,21 +8,10 @@
  *     The data MUST pass validation before it can be downloaded or emailed,
  *     and ANY change to the data invalidates a previous "valid" result.
  *
- * Validation status
- * -----------------
- *   'unvalidated' — never validated, or edited since the last validation.
- *   'validating'  — a /validate-table request is in flight.
- *   'valid'       — last validation passed; export/email are allowed.
- *   'invalid'     — last validation found per-cell errors (cells are red).
- *
  * Errors are keyed by the row's stable `_id` (not array index) so deleting or
  * reordering rows can never paint the wrong cell red. The validation request
- * still uses array index (that's what the backend reports against); we translate
- * index → `_id` immediately after each validation.
- *
- * Returned actions are intentionally granular and side-effect free w.r.t. the
- * network except `validate`, `download*`, and `sendEmail`, so the component
- * layer stays declarative.
+ * uses array index (what the backend reports against); we translate index → id
+ * immediately after each validation.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -30,25 +19,51 @@ import {
   validateTable,
   downloadExcel as apiDownloadExcel,
   sendEmailReport as apiSendEmail,
-} from '../api/phoneMappingApi.js';
-import { createEmptyRow, toGridRow, toBackendRows } from '../utils/rowFactory.js';
-import { normalizeUploadedRows } from '../utils/uploadNormalizer.js';
-import { normalizeValidation, pruneUnknownColumns } from '../utils/validationAdapter.js';
+} from '../api/phoneMappingApi';
+import { createEmptyRow, toGridRow, toBackendRows } from '../utils/rowFactory';
+import { normalizeUploadedRows } from '../utils/uploadNormalizer';
+import { normalizeValidation, pruneUnknownColumns } from '../utils/validationAdapter';
+import type {
+  BlobResult,
+} from '../api/client';
+import type {
+  CellErrorsById,
+  CellValue,
+  EmailParams,
+  GridRow,
+  ValidationStatus,
+} from '../types';
 
 export const STATUS = {
   UNVALIDATED: 'unvalidated',
   VALIDATING: 'validating',
   VALID: 'valid',
   INVALID: 'invalid',
-};
+} as const satisfies Record<string, ValidationStatus>;
 
-export function usePhoneTable(initialRows = []) {
-  const [rows, setRowsState] = useState(() =>
-    initialRows.length ? initialRows.map(toGridRow) : [createEmptyRow()],
+export interface UsePhoneTableResult {
+  rows: GridRow[];
+  errorsById: CellErrorsById;
+  status: ValidationStatus;
+  totalErrors: number;
+  hasData: boolean;
+  canExport: boolean;
+  addRow: () => void;
+  deleteRow: (rowId: string) => void;
+  updateCell: (rowId: string, columnKey: string, value: CellValue) => void;
+  setRows: (next: GridRow[]) => void;
+  loadUploadedRows: (rawRows: Array<Record<string, unknown>>) => void;
+  validate: () => Promise<{ isValid: boolean; errorCount: number }>;
+  downloadExcel: () => Promise<BlobResult>;
+  sendEmail: (params: EmailParams) => Promise<unknown>;
+}
+
+export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult {
+  const [rows, setRowsState] = useState<GridRow[]>(() =>
+    initialRows.length ? initialRows.map((r) => toGridRow(r)) : [createEmptyRow()],
   );
-  /** errorsById: { [rowId]: { [columnKey]: message } } */
-  const [errorsById, setErrorsById] = useState({});
-  const [status, setStatus] = useState(STATUS.UNVALIDATED);
+  const [errorsById, setErrorsById] = useState<CellErrorsById>({});
+  const [status, setStatus] = useState<ValidationStatus>(STATUS.UNVALIDATED);
 
   /**
    * Any mutation marks the table stale: clear the "valid/invalid" verdict so
@@ -61,7 +76,7 @@ export function usePhoneTable(initialRows = []) {
   // --- Row mutations --------------------------------------------------------
 
   const setRows = useCallback(
-    (next) => {
+    (next: GridRow[]) => {
       setRowsState(next);
       setErrorsById({});
       markStale();
@@ -75,7 +90,7 @@ export function usePhoneTable(initialRows = []) {
   }, [markStale]);
 
   const deleteRow = useCallback(
-    (rowId) => {
+    (rowId: string) => {
       setRowsState((prev) => {
         const next = prev.filter((r) => r._id !== rowId);
         // Never leave the grid completely empty — keep one editable row.
@@ -91,7 +106,7 @@ export function usePhoneTable(initialRows = []) {
   );
 
   const updateCell = useCallback(
-    (rowId, columnKey, value) => {
+    (rowId: string, columnKey: string, value: CellValue) => {
       setRowsState((prev) =>
         prev.map((r) => (r._id === rowId ? { ...r, [columnKey]: value } : r)),
       );
@@ -112,7 +127,7 @@ export function usePhoneTable(initialRows = []) {
 
   /** Replace all rows from an uploaded spreadsheet (keys are normalized). */
   const loadUploadedRows = useCallback(
-    (rawRows) => {
+    (rawRows: Array<Record<string, unknown>>) => {
       const normalized = normalizeUploadedRows(rawRows);
       setRows(normalized.length ? normalized : [createEmptyRow()]);
     },
@@ -121,10 +136,6 @@ export function usePhoneTable(initialRows = []) {
 
   // --- Validation -----------------------------------------------------------
 
-  /**
-   * Validate via the backend, map errors onto rows, and update status.
-   * @returns {Promise<{ isValid: boolean, errorCount: number }>}
-   */
   const validate = useCallback(async () => {
     setStatus(STATUS.VALIDATING);
     const orderedRows = rows; // snapshot: index → _id mapping for this run
@@ -134,7 +145,7 @@ export function usePhoneTable(initialRows = []) {
     const normalized = pruneUnknownColumns(normalizeValidation(raw));
 
     // Translate index-keyed errors onto stable row ids.
-    const byId = {};
+    const byId: CellErrorsById = {};
     for (const [indexStr, cols] of Object.entries(normalized.cellErrors)) {
       const row = orderedRows[Number(indexStr)];
       if (row) byId[row._id] = cols;
@@ -161,7 +172,7 @@ export function usePhoneTable(initialRows = []) {
   }, [ensureValidated, getExportRows]);
 
   const sendEmail = useCallback(
-    async ({ recipient, subject, message }) => {
+    async ({ recipient, subject, message }: EmailParams) => {
       ensureValidated();
       return apiSendEmail({ recipient, rows: getExportRows(), subject, message });
     },
@@ -171,8 +182,7 @@ export function usePhoneTable(initialRows = []) {
   // --- Derived state --------------------------------------------------------
 
   const totalErrors = useMemo(
-    () =>
-      Object.values(errorsById).reduce((sum, cols) => sum + Object.keys(cols).length, 0),
+    () => Object.values(errorsById).reduce((sum, cols) => sum + Object.keys(cols).length, 0),
     [errorsById],
   );
 
@@ -184,20 +194,17 @@ export function usePhoneTable(initialRows = []) {
   const canExport = status === STATUS.VALID && hasData;
 
   return {
-    // state
     rows,
     errorsById,
     status,
     totalErrors,
     hasData,
     canExport,
-    // row actions
     addRow,
     deleteRow,
     updateCell,
     setRows,
     loadUploadedRows,
-    // network actions
     validate,
     downloadExcel,
     sendEmail,

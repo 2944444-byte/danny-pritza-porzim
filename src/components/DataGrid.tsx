@@ -1,25 +1,32 @@
 /**
- * DataGrid.jsx
+ * DataGrid.tsx
  * -----------------------------------------------------------------------------
  * Renders the editable table: a header row derived from COLUMNS, one row per
  * data record (each with a delete button), and an EditableCell per column.
  *
- * It is a "dumb" presentational component — all state and behavior come in via
- * props from usePhoneTable, which keeps it trivial to test and restyle.
+ * A "dumb" presentational component — all state and behavior come in via props
+ * from usePhoneTable, which keeps it trivial to test and restyle.
  */
 
-import { COLUMNS } from '../config/columns.js';
-import { EditableCell } from './EditableCell.jsx';
+import { COLUMNS } from '../config/columns';
+import { EditableCell } from './EditableCell';
+import type { CellErrorsById, CellValue, GridRow, SchemaMeta } from '../types';
 
-/**
- * @param {Object} props
- * @param {Array<Record<string, unknown>>} props.rows
- * @param {Record<string, Record<string, string>>} props.errorsById
- * @param {Record<string, string[]>} props.schemaOptions  /schema-meta result
- * @param {(rowId: string, key: string, value: unknown) => void} props.onCellChange
- * @param {(rowId: string) => void} props.onDeleteRow
- */
-export function DataGrid({ rows, errorsById, schemaOptions, onCellChange, onDeleteRow }) {
+export interface DataGridProps {
+  rows: GridRow[];
+  errorsById: CellErrorsById;
+  schemaOptions: SchemaMeta;
+  onCellChange: (rowId: string, key: string, value: CellValue) => void;
+  onDeleteRow: (rowId: string) => void;
+}
+
+export function DataGrid({
+  rows,
+  errorsById,
+  schemaOptions,
+  onCellChange,
+  onDeleteRow,
+}: DataGridProps) {
   return (
     <div className="grid-scroll">
       <table className="data-grid">
@@ -31,7 +38,12 @@ export function DataGrid({ rows, errorsById, schemaOptions, onCellChange, onDele
             {COLUMNS.map((col) => (
               <th key={col.key} scope="col">
                 {col.label}
-                {col.required && <span className="required-mark" title="Required"> *</span>}
+                {col.required && (
+                  <span className="required-mark" title="Required">
+                    {' '}
+                    *
+                  </span>
+                )}
               </th>
             ))}
             <th className="actions-head" scope="col">

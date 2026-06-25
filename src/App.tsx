@@ -1,5 +1,5 @@
 /**
- * App.jsx
+ * App.tsx
  * -----------------------------------------------------------------------------
  * Top-level container that composes the feature:
  *   - loads dropdown options (useSchemaMeta)
@@ -13,17 +13,18 @@
  */
 
 import { useCallback, useState } from 'react';
-import { Toolbar } from './components/Toolbar.jsx';
-import { DataGrid } from './components/DataGrid.jsx';
-import { StatusBanner } from './components/StatusBanner.jsx';
-import { EmailDialog } from './components/EmailDialog.jsx';
-import { ToastStack } from './components/Toast.jsx';
-import { useToasts } from './hooks/useToasts.js';
-import { usePhoneTable } from './hooks/usePhoneTable.js';
-import { useSchemaMeta } from './hooks/useSchemaMeta.js';
-import { uploadExcel, downloadTemplate as apiDownloadTemplate } from './api/phoneMappingApi.js';
-import { saveBlob } from './utils/download.js';
-import { DEFAULT_EXPORT_FILENAME, DEFAULT_TEMPLATE_FILENAME } from './config/appConfig.js';
+import { Toolbar } from './components/Toolbar';
+import { DataGrid } from './components/DataGrid';
+import { StatusBanner } from './components/StatusBanner';
+import { EmailDialog } from './components/EmailDialog';
+import { ToastStack } from './components/Toast';
+import { useToasts } from './hooks/useToasts';
+import { usePhoneTable } from './hooks/usePhoneTable';
+import { useSchemaMeta } from './hooks/useSchemaMeta';
+import { uploadExcel, downloadTemplate as apiDownloadTemplate } from './api/phoneMappingApi';
+import { saveBlob } from './utils/download';
+import { DEFAULT_EXPORT_FILENAME, DEFAULT_TEMPLATE_FILENAME } from './config/appConfig';
+import type { EmailParams } from './types';
 
 /** The manager's email, injected at build/runtime if available (optional). */
 const DEFAULT_MANAGER_EMAIL = import.meta.env.VITE_MANAGER_EMAIL || '';
@@ -41,12 +42,12 @@ export default function App() {
 
   /** Run an async action with shared busy state + uniform error toasts. */
   const runAction = useCallback(
-    async (fn) => {
+    async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
       setBusy(true);
       try {
         return await fn();
       } catch (e) {
-        notify(e?.message ?? 'Something went wrong.', 'error', 7000);
+        notify(e instanceof Error ? e.message : 'Something went wrong.', 'error', 7000);
         return undefined;
       } finally {
         setBusy(false);
@@ -58,7 +59,7 @@ export default function App() {
   // --- Action handlers ------------------------------------------------------
 
   const handleUpload = useCallback(
-    (file) =>
+    (file: File) =>
       runAction(async () => {
         const rawRows = await uploadExcel(file);
         table.loadUploadedRows(rawRows);
@@ -105,7 +106,7 @@ export default function App() {
   );
 
   const handleSendEmail = useCallback(
-    ({ recipient, subject, message }) =>
+    ({ recipient, subject, message }: EmailParams) =>
       runAction(async () => {
         setSending(true);
         try {
@@ -142,7 +143,7 @@ export default function App() {
           <span className="status-banner__dot" aria-hidden="true" />
           <span>
             Could not load dropdown options ({schemaError}).{' '}
-            <button type="button" className="link-btn" onClick={reload}>
+            <button type="button" className="link-btn" onClick={() => void reload()}>
               Retry
             </button>
           </span>
@@ -176,8 +177,8 @@ export default function App() {
 
       <footer className="app__footer">
         <span>
-          {table.rows.length} row{table.rows.length === 1 ? '' : 's'} ·{' '}
-          {table.totalErrors} error{table.totalErrors === 1 ? '' : 's'}
+          {table.rows.length} row{table.rows.length === 1 ? '' : 's'} · {table.totalErrors} error
+          {table.totalErrors === 1 ? '' : 's'}
         </span>
         <span className="app__hint">* required field</span>
       </footer>

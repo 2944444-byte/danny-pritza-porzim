@@ -1,29 +1,24 @@
 /**
- * appConfig.js
+ * appConfig.ts
  * -----------------------------------------------------------------------------
  * Central, environment-aware configuration for talking to the backend API.
  *
  * Everything that depends on *where* the backend lives or *what the routes are
- * called* is defined here, so that wiring the UI to a different deployment (or
- * renaming a route on the backend) is a one-line change with no hunting through
- * components.
+ * called* is defined here, so wiring the UI to a different deployment (or
+ * renaming a route on the backend) is a one-line change.
  *
  * The base URL is read from a Vite env var (`VITE_API_BASE_URL`) so it can be
- * configured per environment (.env.development, .env.production, CI, etc.)
- * without code changes. See `.env.example`.
+ * configured per environment without code changes. See `.env.example`.
  */
 
 /** Base URL of the FastAPI backend. Falls back to the local dev default. */
-export const API_BASE_URL =
+export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000';
 
 /**
  * All backend routes in one place. These map 1:1 to the FastAPI endpoints.
- *
- * NOTE: `downloadExcel` and `sendEmail` correspond to the endpoints the backend
- * author described as "Download and email functions ... relying on
- * schema_manager.validate_table". If your backend names them differently, this
- * is the only place you need to update.
+ * `downloadExcel` / `sendEmail` correspond to the backend's download/email
+ * functions — rename here if yours differ.
  */
 export const ENDPOINTS = {
   schemaMeta: '/schema-meta',
@@ -32,8 +27,8 @@ export const ENDPOINTS = {
   downloadTemplate: '/download-template',
   downloadExcel: '/download-excel',
   sendEmail: '/send-email',
-};
+} as const;
 
-/** Default filename used when the server does not provide a Content-Disposition. */
+/** Default filenames used when the server does not provide a Content-Disposition. */
 export const DEFAULT_EXPORT_FILENAME = 'phone_mappings.xlsx';
 export const DEFAULT_TEMPLATE_FILENAME = 'phone_mapping_template.xlsx';

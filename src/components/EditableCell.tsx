@@ -1,31 +1,46 @@
 /**
- * EditableCell.jsx
+ * EditableCell.tsx
  * -----------------------------------------------------------------------------
  * Renders a single editable cell whose editor depends on the column type:
- *   - dropdown → <select> populated from /schema-meta (with the current value
- *                kept selectable even if it's not in the option list, so bad
- *                uploaded data is still visible and fixable)
+ *   - dropdown → <select> populated from /schema-meta (current value kept
+ *                selectable even if not in the option list, so bad uploaded data
+ *                stays visible and fixable)
  *   - integer  → numeric <input>
  *   - wkt/text/phone → text <input>
  *
- * Error presentation (per the requirements):
- *   - When the cell has a validation error, it turns red.
- *   - Hovering shows the backend's error message as a tooltip. We use both a
- *     native `title` (accessible / always works) and a styled CSS tooltip
- *     (nicer UX). The message text comes straight from the API.
+ * Error presentation (per the requirements): an invalid cell turns red, and
+ * hovering shows the backend's error message (native `title` + styled tooltip).
  */
 
-import { memo } from 'react';
+import { memo, type ChangeEvent } from 'react';
+import type { CellValue, ColumnDef } from '../types';
 
-function EditableCellBase({ column, value, error, rowId, dropdownOptions, onChange }) {
+export interface EditableCellProps {
+  column: ColumnDef;
+  value: CellValue;
+  error?: string;
+  rowId: string;
+  dropdownOptions?: string[];
+  onChange: (rowId: string, key: string, value: CellValue) => void;
+}
+
+function EditableCellBase({
+  column,
+  value,
+  error,
+  rowId,
+  dropdownOptions,
+  onChange,
+}: EditableCellProps) {
   const hasError = Boolean(error);
   const commonClass = `cell-input${hasError ? ' cell-input--error' : ''}`;
-  const handle = (e) => onChange(rowId, column.key, e.target.value);
+  const handle = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>) =>
+    onChange(rowId, column.key, e.target.value);
 
   const isDropdown =
-    column.type === 'dropdown' || (dropdownOptions && dropdownOptions.length > 0);
+    column.type === 'dropdown' || (dropdownOptions !== undefined && dropdownOptions.length > 0);
 
-  let editor;
+  let editor: JSX.Element;
   if (isDropdown) {
     const options = dropdownOptions ?? [];
     const valueMissingFromOptions =
@@ -54,7 +69,9 @@ function EditableCellBase({ column, value, error, rowId, dropdownOptions, onChan
         value={value ?? ''}
         placeholder={column.placeholder}
         onChange={handle}
-        inputMode={column.type === 'integer' || column.type === 'phone' ? 'numeric' : undefined}
+        inputMode={
+          column.type === 'integer' || column.type === 'phone' ? 'numeric' : undefined
+        }
       />
     );
   }

@@ -1,30 +1,29 @@
 /**
- * useToasts.js
+ * useToasts.ts
  * -----------------------------------------------------------------------------
  * Manages a queue of transient toast notifications. Kept separate from the
- * presentational <ToastStack> so both the hook and the component stay
- * single-purpose (and Fast Refresh stays happy).
+ * presentational <ToastStack> so both stay single-purpose.
  */
 
 import { useCallback, useRef, useState } from 'react';
+import type { ToastItem, ToastTone } from '../types';
 
-/**
- * @returns {{
- *   toasts: Array<{id:number, message:string, tone:string}>,
- *   notify: (message: string, tone?: string, ttl?: number) => void,
- *   dismiss: (id: number) => void
- * }}
- */
-export function useToasts() {
-  const [toasts, setToasts] = useState([]);
+export interface UseToastsResult {
+  toasts: ToastItem[];
+  notify: (message: string, tone?: ToastTone, ttl?: number) => void;
+  dismiss: (id: number) => void;
+}
+
+export function useToasts(): UseToastsResult {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
 
-  const dismiss = useCallback((id) => {
+  const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const notify = useCallback(
-    (message, tone = 'info', ttl = 4500) => {
+    (message: string, tone: ToastTone = 'info', ttl = 4500) => {
       idRef.current += 1;
       const id = idRef.current;
       setToasts((prev) => [...prev, { id, message, tone }]);

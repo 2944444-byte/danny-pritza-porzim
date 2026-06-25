@@ -1,15 +1,24 @@
 /**
- * StatusBanner.jsx
+ * StatusBanner.tsx
  * -----------------------------------------------------------------------------
  * A compact, color-coded summary of the current validation status. It tells the
  * user exactly why export/email may be disabled and what to do next.
  */
 
-import { STATUS } from '../hooks/usePhoneTable.js';
+import { STATUS } from '../hooks/usePhoneTable';
+import type { ValidationStatus } from '../types';
 
-export function StatusBanner({ status, totalErrors, hasData }) {
-  let tone = 'info';
-  let text;
+export interface StatusBannerProps {
+  status: ValidationStatus;
+  totalErrors: number;
+  hasData: boolean;
+}
+
+type Tone = 'info' | 'success' | 'warning' | 'error';
+
+export function StatusBanner({ status, totalErrors, hasData }: StatusBannerProps) {
+  let tone: Tone = 'info';
+  let text: string;
 
   if (!hasData) {
     tone = 'info';
@@ -22,7 +31,8 @@ export function StatusBanner({ status, totalErrors, hasData }) {
         break;
       case STATUS.VALID:
         tone = 'success';
-        text = 'All data is valid. You can now download the Excel file or send an email report.';
+        text =
+          'All data is valid. You can now download the Excel file or send an email report.';
         break;
       case STATUS.INVALID:
         tone = 'error';

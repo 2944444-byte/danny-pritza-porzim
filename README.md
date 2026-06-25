@@ -1,7 +1,8 @@
 # Company Phone Mapping
 
-A modular React interface for mapping every phone in your company and validating
-the data against your backend API before exporting or emailing it.
+A modular **React + TypeScript** (Vite) interface for mapping every phone in your
+company and validating the data against your backend API before exporting or
+emailing it.
 
 For each phone number you record:
 
@@ -27,7 +28,7 @@ For each phone number you record:
 ## The core rule: validate before export
 
 The data must pass validation before it can be downloaded or emailed. This is
-enforced centrally in [`src/hooks/usePhoneTable.js`](src/hooks/usePhoneTable.js):
+enforced centrally in [`src/hooks/usePhoneTable.ts`](src/hooks/usePhoneTable.ts):
 
 - Validation status is one of `unvalidated → validating → valid | invalid`.
 - **Any** change (edit a cell, add/delete a row, upload a file) resets the status
@@ -72,33 +73,43 @@ the dev server can talk to it directly.
 
 ```
 src/
+├── types.ts                  # shared, app-wide TypeScript types
 ├── api/
-│   ├── client.js            # fetch wrapper: base URL, JSON/blob, ApiError
-│   └── phoneMappingApi.js   # one function per backend endpoint
+│   ├── client.ts            # fetch wrapper: base URL, JSON/blob, ApiError
+│   └── phoneMappingApi.ts   # one function per backend endpoint
 ├── config/
-│   ├── appConfig.js         # API base URL + endpoint paths (env-driven)
-│   └── columns.js           # ★ single source of truth for the columns
+│   ├── appConfig.ts         # API base URL + endpoint paths (env-driven)
+│   └── columns.ts           # ★ single source of truth for the columns
 ├── hooks/
-│   ├── useSchemaMeta.js      # loads dropdown options from /schema-meta
-│   └── usePhoneTable.js      # ★ table state + validation state machine
+│   ├── useSchemaMeta.ts      # loads dropdown options from /schema-meta
+│   ├── useToasts.ts          # transient-notification state
+│   └── usePhoneTable.ts      # ★ table state + validation state machine
 ├── utils/
-│   ├── validationAdapter.js  # normalizes /validate-table responses → cell errors
-│   ├── uploadNormalizer.js   # maps uploaded headers onto canonical column keys
-│   ├── rowFactory.js         # create/shape rows; strip UI-only fields for payloads
-│   └── download.js           # browser "Save As" for blobs
+│   ├── validationAdapter.ts  # normalizes /validate-table responses → cell errors
+│   ├── uploadNormalizer.ts   # maps uploaded headers onto canonical column keys
+│   ├── rowFactory.ts         # create/shape rows; strip UI-only fields for payloads
+│   └── download.ts           # browser "Save As" for blobs
 ├── components/
-│   ├── Toolbar.jsx           # all actions; export buttons gated by canExport
-│   ├── DataGrid.jsx          # the editable table
-│   ├── EditableCell.jsx      # per-type editor + red state + tooltip
-│   ├── StatusBanner.jsx      # plain-language validation status
-│   ├── EmailDialog.jsx       # recipient/subject/message modal
-│   └── Toast.jsx             # transient notifications + useToasts hook
+│   ├── Toolbar.tsx           # all actions; export buttons gated by canExport
+│   ├── DataGrid.tsx          # the editable table
+│   ├── EditableCell.tsx      # per-type editor + red state + tooltip
+│   ├── StatusBanner.tsx      # plain-language validation status
+│   ├── EmailDialog.tsx       # recipient/subject/message modal
+│   └── Toast.tsx             # presentational toast stack
 ├── styles/global.css         # design tokens + all styling
-├── App.jsx                   # composition root (wires hooks ↔ components)
-└── main.jsx                  # React entry point
+├── vite-env.d.ts             # typings for import.meta.env
+├── App.tsx                   # composition root (wires hooks ↔ components)
+└── main.tsx                  # React entry point
 ```
 
-★ = the two files you will most often edit.
+★ = the two files you will most often edit. Shared data types live in
+`src/types.ts`.
+
+### Type-checking
+
+```bash
+npm run typecheck   # tsc --noEmit (also runs as part of `npm run build`)
+```
 
 ## Adapting to your backend
 
@@ -106,18 +117,18 @@ This project was built against the provided backend. Two backend modules
 (`table_handler.py` / `consts.py`) were not included, so the app is deliberately
 tolerant about exact response shapes. Adjust these spots if needed:
 
-1. **Column keys** — [`src/config/columns.js`](src/config/columns.js). Each
+1. **Column keys** — [`src/config/columns.ts`](src/config/columns.ts). Each
    column's `key` must equal the backend JSON key (`BaseColumn.name`). If your
    backend uses, say, `geographic_location_(wkt)`, change the `key` there and the
    whole app follows. `aliases` already maps common uploaded-header variants.
 
-2. **Endpoint paths** — [`src/config/appConfig.js`](src/config/appConfig.js).
+2. **Endpoint paths** — [`src/config/appConfig.ts`](src/config/appConfig.ts).
    `downloadExcel` (`POST /download-excel`) and `sendEmail` (`POST /send-email`)
    correspond to the backend's download/email functions; rename here if yours
    differ.
 
 3. **Validation response shape** —
-   [`src/utils/validationAdapter.js`](src/utils/validationAdapter.js) already
+   [`src/utils/validationAdapter.ts`](src/utils/validationAdapter.ts) already
    handles the common shapes (list of `{row, column, message}` errors, per-row
    maps, index-keyed objects, or a simple validity flag). If your
    `/validate-table` returns something else, extend `normalizeValidation` there —

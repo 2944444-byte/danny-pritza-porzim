@@ -1,5 +1,5 @@
 /**
- * Toolbar.jsx
+ * Toolbar.tsx
  * -----------------------------------------------------------------------------
  * The action bar holding every operation the manager needs:
  *   Upload Excel · Add Row · Download Template · Validate Data ·
@@ -9,10 +9,20 @@
  *
  * Export actions (Download Excel / Send Email) are DISABLED until validation
  * passes — enforced here via `canExport` and, defensively, again in the hook.
- * The component is presentational: handlers are injected from App.
  */
 
-import { useRef } from 'react';
+import { useRef, type ChangeEvent } from 'react';
+
+export interface ToolbarProps {
+  canExport: boolean;
+  busy: boolean;
+  onUploadFile: (file: File) => void;
+  onAddRow: () => void;
+  onDownloadTemplate: () => void;
+  onValidate: () => void;
+  onDownloadExcel: () => void;
+  onOpenEmail: () => void;
+}
 
 export function Toolbar({
   canExport,
@@ -23,10 +33,10 @@ export function Toolbar({
   onValidate,
   onDownloadExcel,
   onOpenEmail,
-}) {
-  const fileInputRef = useRef(null);
+}: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) onUploadFile(file);
     // Reset so selecting the same file again re-triggers onChange.
@@ -66,12 +76,7 @@ export function Toolbar({
       </div>
 
       <div className="toolbar__group toolbar__group--right">
-        <button
-          type="button"
-          className="btn btn--primary"
-          disabled={busy}
-          onClick={onValidate}
-        >
+        <button type="button" className="btn btn--primary" disabled={busy} onClick={onValidate}>
           ✔ Validate Data
         </button>
         <button

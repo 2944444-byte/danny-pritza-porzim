@@ -1,12 +1,18 @@
 /**
- * Toast.jsx
+ * Toast.tsx
  * -----------------------------------------------------------------------------
  * Presentational toast stack. State is owned by the `useToasts` hook
- * (src/hooks/useToasts.js); this component only renders the active toasts.
+ * (src/hooks/useToasts.ts); this component only renders the active toasts.
  */
 
-/** Renders the active toasts in a fixed stack. */
-export function ToastStack({ toasts, onDismiss }) {
+import type { ToastItem } from '../types';
+
+export interface ToastStackProps {
+  toasts: ToastItem[];
+  onDismiss: (id: number) => void;
+}
+
+export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
   return (
     <div className="toast-stack" aria-live="assertive">
       {toasts.map((t) => (

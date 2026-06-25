@@ -1,24 +1,38 @@
 /**
- * EmailDialog.jsx
+ * EmailDialog.tsx
  * -----------------------------------------------------------------------------
  * Modal form for sending the validated data as an email report. Collects the
  * recipient (pre-filled with the manager's address if provided), an optional
  * subject, and an optional message. Submission is delegated to the parent.
- *
- * The dialog can only be opened when the data is valid (the toolbar enforces
- * this), so it does not re-implement that gate; it focuses on capturing input.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { EmailParams } from '../types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function EmailDialog({ open, defaultRecipient = '', rowCount, sending, onClose, onSend }) {
+export interface EmailDialogProps {
+  open: boolean;
+  defaultRecipient?: string;
+  rowCount: number;
+  sending: boolean;
+  onClose: () => void;
+  onSend: (params: EmailParams) => void;
+}
+
+export function EmailDialog({
+  open,
+  defaultRecipient = '',
+  rowCount,
+  sending,
+  onClose,
+  onSend,
+}: EmailDialogProps) {
   const [recipient, setRecipient] = useState(defaultRecipient);
   const [subject, setSubject] = useState('Phone Mapping Report');
   const [message, setMessage] = useState('');
   const [touched, setTouched] = useState(false);
-  const firstFieldRef = useRef(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   // Reset fields each time the dialog opens.
   useEffect(() => {
@@ -27,7 +41,6 @@ export function EmailDialog({ open, defaultRecipient = '', rowCount, sending, on
       setSubject('Phone Mapping Report');
       setMessage('');
       setTouched(false);
-      // Focus the first field for keyboard users.
       setTimeout(() => firstFieldRef.current?.focus(), 0);
     }
   }, [open, defaultRecipient]);
@@ -36,7 +49,7 @@ export function EmailDialog({ open, defaultRecipient = '', rowCount, sending, on
 
   const recipientValid = EMAIL_RE.test(recipient.trim());
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setTouched(true);
     if (!recipientValid) return;
@@ -102,11 +115,7 @@ export function EmailDialog({ open, defaultRecipient = '', rowCount, sending, on
             <button type="button" className="btn" onClick={onClose} disabled={sending}>
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn btn--accent"
-              disabled={sending || !recipientValid}
-            >
+            <button type="submit" className="btn btn--accent" disabled={sending || !recipientValid}>
               {sending ? 'Sending…' : 'Send Report'}
             </button>
           </div>
