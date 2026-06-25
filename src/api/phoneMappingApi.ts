@@ -62,8 +62,9 @@ export function downloadTemplate(): Promise<BlobResult> {
  * Download the current (validated) data as an Excel file.
  * Backend: POST /download-excel with body = array of row objects → xlsx blob.
  */
-export function downloadExcel(rows: BackendRow[]): Promise<BlobResult> {
-  return requestBlob(ENDPOINTS.downloadExcel, {
+export function downloadExcel(rows: BackendRow[], title?: string): Promise<BlobResult> {
+  const query = title ? `?title=${encodeURIComponent(title)}` : '';
+  return requestBlob(`${ENDPOINTS.downloadExcel}${query}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rows),
@@ -75,12 +76,12 @@ export function downloadExcel(rows: BackendRow[]): Promise<BlobResult> {
  * Backend: POST /send-email with body = { recipient, data, subject, message }.
  */
 export function sendEmailReport(
-  params: EmailParams & { rows: BackendRow[] },
+  params: EmailParams & { rows: BackendRow[]; title?: string },
 ): Promise<unknown> {
-  const { recipient, rows, subject, message } = params;
+  const { recipient, rows, subject, message, title } = params;
   return requestJson<unknown>(ENDPOINTS.sendEmail, {
     method: 'POST',
-    body: JSON.stringify({ recipient, data: rows, subject, message }),
+    body: JSON.stringify({ recipient, data: rows, subject, message, title }),
   });
 }
 

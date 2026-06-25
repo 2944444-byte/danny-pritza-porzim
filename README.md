@@ -24,6 +24,9 @@ For each phone number you record:
   hovering shows the **exact error message returned by the API** to help fix them.
 - **Download Excel / Send Email report** – both are **locked until validation
   passes**. Any edit re-locks them until you validate again.
+- **Excel file title** – a title field on the main page names the downloaded
+  `.xlsx` file and is sent with the email report (used as the default subject and
+  the attachment filename). Non-ASCII titles (e.g. Hebrew) are supported.
 - **Admin availability schedule** – an admin page (`#/admin`) controls which
   **days** and **hours** the site is reachable. Outside those times users get a
   closed page and validation is disabled (enforced server-side too).

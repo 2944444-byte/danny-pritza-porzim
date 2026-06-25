@@ -14,6 +14,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export interface EmailDialogProps {
   open: boolean;
   defaultRecipient?: string;
+  defaultSubject?: string;
   rowCount: number;
   sending: boolean;
   onClose: () => void;
@@ -23,13 +24,14 @@ export interface EmailDialogProps {
 export function EmailDialog({
   open,
   defaultRecipient = '',
+  defaultSubject,
   rowCount,
   sending,
   onClose,
   onSend,
 }: EmailDialogProps) {
   const [recipient, setRecipient] = useState(defaultRecipient);
-  const [subject, setSubject] = useState('Phone Mapping Report');
+  const [subject, setSubject] = useState(defaultSubject || 'Phone Mapping Report');
   const [message, setMessage] = useState('');
   const [touched, setTouched] = useState(false);
   const firstFieldRef = useRef<HTMLInputElement>(null);
@@ -38,12 +40,12 @@ export function EmailDialog({
   useEffect(() => {
     if (open) {
       setRecipient(defaultRecipient);
-      setSubject('Phone Mapping Report');
+      setSubject(defaultSubject || 'Phone Mapping Report');
       setMessage('');
       setTouched(false);
       setTimeout(() => firstFieldRef.current?.focus(), 0);
     }
-  }, [open, defaultRecipient]);
+  }, [open, defaultRecipient, defaultSubject]);
 
   if (!open) return null;
 

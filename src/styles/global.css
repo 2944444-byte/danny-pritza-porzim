@@ -649,3 +649,54 @@ select.cell-input {
   display: flex;
   justify-content: flex-end;
 }
+
+/* ----------------------------------------------------- Excel title bar */
+
+.sheet-title-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  margin-bottom: 14px;
+}
+
+.sheet-title-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 360px;
+}
+
+.sheet-title-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #41506a;
+  white-space: nowrap;
+}
+
+.sheet-title-input {
+  flex: 1;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+}
+
+.sheet-title-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(47, 109, 246, 0.15);
+}
+
+.sheet-title-hint {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}

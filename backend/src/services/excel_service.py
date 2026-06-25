@@ -48,9 +48,21 @@ def read_rows(contents: bytes) -> List[Dict[str, Any]]:
     return records
 
 
-def build_workbook_bytes(
-    rows: List[Dict[str, Any]], schema: TableSchemaManager
-) -> bytes:
+import re
+
+# Characters that are unsafe in a download filename.
+_INVALID_FILE_CHARS = re.compile(r'[\\/:*?"<>|]+')
+
+
+def safe_filename(title: str | None, default: str = "phone_mappings") -> str:
+    """Turn a user title into a safe `.xlsx` download filename (whole-file name)."""
+    cleaned = _INVALID_FILE_CHARS.sub("", (title or "").strip())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    name = cleaned or default
+    return name if name.lower().endswith(".xlsx") else f"{name}.xlsx"
+
+
+def build_workbook_bytes(rows: List[Dict[str, Any]], schema: TableSchemaManager) -> bytes:
     """Return the bytes of an .xlsx file containing `rows` under the schema headers."""
     wb = openpyxl.Workbook()
     ws = wb.active

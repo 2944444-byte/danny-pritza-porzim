@@ -25,10 +25,17 @@ from fastapi import FastAPI, File, Header, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
+from urllib.parse import quote
+
 from src.tables.table_handler import TableSchemaManager
-from src.services.excel_service import build_workbook_bytes, read_rows
+from src.services.excel_service import build_workbook_bytes, read_rows, safe_filename
 from src.services.email_service import send_report, EXCEL_MIME
 from src.services import schedule_service
+
+
+def _attachment_disposition(filename: str) -> str:
+    """Content-Disposition that survives non-ASCII (e.g. Hebrew) filenames."""
+    return f"attachment; filename*=UTF-8''{quote(filename)}"
 
 app = FastAPI(title="Phone Mapping API")
 
@@ -51,6 +58,8 @@ class EmailRequest(BaseModel):
     data: List[Dict[str, Any]]
     subject: str | None = "Phone Mapping Report"
     message: str | None = ""
+    # User-supplied sheet title → names the attachment (and the sheet tab).
+    title: str | None = None
 
 
 class DaySchedule(BaseModel):
@@ -188,10 +197,12 @@ async def download_template():
 
 
 @app.post("/download-excel")
-def download_excel(table_data: List[Dict[str, Any]]):
+def download_excel(table_data: List[Dict[str, Any]], title: str | None = None):
     """
     Export the rows as an .xlsx file. Re-validates server-side and refuses to
     export invalid data, mirroring the UI's "validate before export" rule.
+
+    `title` (query param) sets the download filename for the whole .xlsx file.
     """
     ensure_open()
     result = schema_manager.validate_table(table_data)
@@ -205,7 +216,7 @@ def download_excel(table_data: List[Dict[str, Any]]):
     return Response(
         content=content,
         media_type=EXCEL_MIME,
-        headers={"Content-Disposition": "attachment; filename=phone_mappings.xlsx"},
+        headers={"Content-Disposition": _attachment_disposition(safe_filename(title))},
     )
 
 
@@ -223,12 +234,13 @@ def send_email(req: EmailRequest):
         )
 
     attachment = build_workbook_bytes(req.data, schema_manager)
+    subject = req.subject or (req.title.strip() if req.title and req.title.strip() else "Phone Mapping Report")
     outcome = send_report(
         recipient=req.recipient,
-        subject=req.subject or "Phone Mapping Report",
+        subject=subject,
         body=req.message or "",
         attachment_bytes=attachment,
-        attachment_name="phone_mappings.xlsx",
+        attachment_name=safe_filename(req.title),
     )
     return outcome
 

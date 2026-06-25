@@ -23,7 +23,8 @@ import { usePhoneTable } from './hooks/usePhoneTable';
 import { useSchemaMeta } from './hooks/useSchemaMeta';
 import { uploadExcel, downloadTemplate as apiDownloadTemplate } from './api/phoneMappingApi';
 import { saveBlob } from './utils/download';
-import { DEFAULT_EXPORT_FILENAME, DEFAULT_TEMPLATE_FILENAME } from './config/appConfig';
+import { toExcelFilename } from './utils/filename';
+import { DEFAULT_TEMPLATE_FILENAME } from './config/appConfig';
 import type { EmailParams } from './types';
 
 /** The manager's email, injected at build/runtime if available (optional). */
@@ -39,6 +40,8 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  // User-entered title for the whole Excel file → download filename + email.
+  const [sheetTitle, setSheetTitle] = useState('');
 
   /** Run an async action with shared busy state + uniform error toasts. */
   const runAction = useCallback(
@@ -98,11 +101,13 @@ export default function App() {
   const handleDownloadExcel = useCallback(
     () =>
       runAction(async () => {
-        const { blob, filename } = await table.downloadExcel();
-        saveBlob(blob, filename || DEFAULT_EXPORT_FILENAME);
+        const title = sheetTitle.trim();
+        const { blob } = await table.downloadExcel(title || undefined);
+        // The user's title is the name of the file.
+        saveBlob(blob, toExcelFilename(title));
         notify('Excel file downloaded.', 'success');
       }),
-    [runAction, table, notify],
+    [runAction, table, notify, sheetTitle],
   );
 
   const handleSendEmail = useCallback(
@@ -110,14 +115,14 @@ export default function App() {
       runAction(async () => {
         setSending(true);
         try {
-          await table.sendEmail({ recipient, subject, message });
+          await table.sendEmail({ recipient, subject, message, title: sheetTitle.trim() || undefined });
           notify(`Report sent to ${recipient}.`, 'success');
           setEmailOpen(false);
         } finally {
           setSending(false);
         }
       }),
-    [runAction, table, notify],
+    [runAction, table, notify, sheetTitle],
   );
 
   // --- Render ---------------------------------------------------------------
@@ -152,6 +157,22 @@ export default function App() {
           </span>
         </div>
       )}
+
+      <div className="sheet-title-bar">
+        <label className="sheet-title-field">
+          <span className="sheet-title-label">Excel file title</span>
+          <input
+            type="text"
+            className="sheet-title-input"
+            value={sheetTitle}
+            onChange={(e) => setSheetTitle(e.target.value)}
+            placeholder="e.g. Q3 Phone Mappings"
+          />
+        </label>
+        <span className="sheet-title-hint">
+          Used as the downloaded file name{sheetTitle.trim() ? ` (${toExcelFilename(sheetTitle.trim())})` : ''} and the email report.
+        </span>
+      </div>
 
       <Toolbar
         canExport={table.canExport}
@@ -189,6 +210,7 @@ export default function App() {
       <EmailDialog
         open={emailOpen}
         defaultRecipient={DEFAULT_MANAGER_EMAIL}
+        defaultSubject={sheetTitle.trim() || undefined}
         rowCount={exportRowCount}
         sending={sending}
         onClose={() => (sending ? null : setEmailOpen(false))}

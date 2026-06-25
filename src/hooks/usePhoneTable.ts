@@ -54,8 +54,8 @@ export interface UsePhoneTableResult {
   setRows: (next: GridRow[]) => void;
   loadUploadedRows: (rawRows: Array<Record<string, unknown>>) => void;
   validate: () => Promise<{ isValid: boolean; errorCount: number }>;
-  downloadExcel: () => Promise<BlobResult>;
-  sendEmail: (params: EmailParams) => Promise<unknown>;
+  downloadExcel: (title?: string) => Promise<BlobResult>;
+  sendEmail: (params: EmailParams & { title?: string }) => Promise<unknown>;
 }
 
 export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult {
@@ -166,15 +166,18 @@ export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult 
 
   const getExportRows = useCallback(() => toBackendRows(rows), [rows]);
 
-  const downloadExcel = useCallback(async () => {
-    ensureValidated();
-    return apiDownloadExcel(getExportRows());
-  }, [ensureValidated, getExportRows]);
+  const downloadExcel = useCallback(
+    async (title?: string) => {
+      ensureValidated();
+      return apiDownloadExcel(getExportRows(), title);
+    },
+    [ensureValidated, getExportRows],
+  );
 
   const sendEmail = useCallback(
-    async ({ recipient, subject, message }: EmailParams) => {
+    async ({ recipient, subject, message, title }: EmailParams & { title?: string }) => {
       ensureValidated();
-      return apiSendEmail({ recipient, rows: getExportRows(), subject, message });
+      return apiSendEmail({ recipient, rows: getExportRows(), subject, message, title });
     },
     [ensureValidated, getExportRows],
   );
