@@ -21,13 +21,12 @@ import io
 from typing import Any, Dict, List
 
 import openpyxl
-import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.tables.table_handler import TableSchemaManager
-from src.services.excel_service import build_workbook_bytes
+from src.services.excel_service import build_workbook_bytes, read_rows
 from src.services.email_service import send_report, EXCEL_MIME
 
 app = FastAPI(title="Phone Mapping API")
@@ -74,13 +73,15 @@ async def upload_excel(file: UploadFile = File(...)):
 
     try:
         contents = await file.read()
-        df = pd.read_excel(io.BytesIO(contents))
+        records = read_rows(contents)
 
-        # Clean columns to match keys
-        df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
-        df = df.fillna("")
-
-        return {"data": df.to_dict(orient="records")}
+        # Clean header keys to match canonical column keys (same rule the
+        # template/headers follow): lowercase, trimmed, spaces → underscores.
+        cleaned = [
+            {str(k).strip().lower().replace(" ", "_"): v for k, v in record.items()}
+            for record in records
+        ]
+        return {"data": cleaned}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Parsing error: {str(e)}")
 

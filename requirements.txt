@@ -1,0 +1,6 @@
+# Python dependencies for the Vercel serverless function (api/index.py).
+# Intentionally lean (no pandas) to stay within serverless size limits.
+fastapi>=0.110
+openpyxl>=3.1
+shapely>=2.0
+python-multipart>=0.0.9

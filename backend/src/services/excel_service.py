@@ -1,8 +1,12 @@
 """
 excel_service.py
 ----------------
-Builds an .xlsx workbook from validated rows, using the schema's display headers
-in column order. Shared by the /download-excel endpoint and the email report.
+Excel helpers shared by the API:
+  - read_rows(): parse an uploaded .xlsx into a list of row dicts.
+  - build_workbook_bytes(): build an .xlsx from validated rows.
+
+Uses openpyxl only (no pandas), which keeps the dependency footprint small —
+important for serverless deployment (e.g. Vercel) where function size is limited.
 """
 
 import io
@@ -11,6 +15,37 @@ from typing import Any, Dict, List
 import openpyxl
 
 from src.tables.table_handler import TableSchemaManager
+
+
+def read_rows(contents: bytes) -> List[Dict[str, Any]]:
+    """
+    Parse the bytes of an .xlsx file into a list of {header: value} dicts, using
+    the first row as the header. Empty cells become "" and fully-empty rows are
+    skipped. Headers are returned as-is (the caller normalizes them).
+    """
+    wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True, data_only=True)
+    ws = wb.active
+    if ws is None:
+        return []
+
+    rows_iter = ws.iter_rows(values_only=True)
+    try:
+        header_row = next(rows_iter)
+    except StopIteration:
+        return []
+
+    headers = ["" if h is None else str(h) for h in header_row]
+
+    records: List[Dict[str, Any]] = []
+    for row in rows_iter:
+        if row is None or all(cell is None for cell in row):
+            continue
+        record: Dict[str, Any] = {}
+        for i, header in enumerate(headers):
+            value = row[i] if i < len(row) else None
+            record[header] = "" if value is None else value
+        records.append(record)
+    return records
 
 
 def build_workbook_bytes(
