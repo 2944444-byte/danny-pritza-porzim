@@ -1,11 +1,11 @@
 /**
  * ClosedPage.tsx
  * -----------------------------------------------------------------------------
- * Full-screen "we're closed" page shown to users when the site is outside its
- * allowed days/hours. The message comes from the backend (Hebrew), so it is
- * rendered right-to-left. A retry button re-checks availability, and a discreet
- * link lets an admin reach the admin page even while the site is closed.
+ * Full-screen "we're closed" page shown to users outside the allowed days/hours.
+ * The message comes from the backend (Hebrew) and is rendered right-to-left.
  */
+
+import { Anchor, Button, Center, Paper, Stack, Text } from '@mantine/core';
 
 export interface ClosedPageProps {
   message: string;
@@ -16,19 +16,34 @@ export interface ClosedPageProps {
 
 export function ClosedPage({ message, onRetry, onAdmin }: ClosedPageProps) {
   return (
-    <div className="closed-page" dir="rtl">
-      <div className="closed-card">
-        <div className="closed-icon" aria-hidden="true">
-          🔒
-        </div>
-        <p className="closed-message">{message}</p>
-        <button type="button" className="btn btn--primary" onClick={onRetry}>
-          נסו שוב
-        </button>
-      </div>
-      <button type="button" className="closed-admin-link" onClick={onAdmin} dir="ltr">
-        Admin
-      </button>
-    </div>
+    <Center
+      mih="100vh"
+      p="md"
+      style={{ background: 'linear-gradient(160deg, #1f2733 0%, #2f3b4c 100%)' }}
+    >
+      <Stack align="center" gap="lg">
+        <Paper
+          radius="lg"
+          p={40}
+          maw={520}
+          ta="center"
+          bg="rgba(255,255,255,0.06)"
+          style={{ border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <Text fz={48} lh={1} mb="sm" aria-hidden>
+            🔒
+          </Text>
+          <Text c="white" fw={600} fz="xl" dir="rtl" mb="lg">
+            {message}
+          </Text>
+          <Button size="md" onClick={onRetry}>
+            נסו שוב
+          </Button>
+        </Paper>
+        <Anchor component="button" type="button" c="gray.5" size="sm" onClick={onAdmin}>
+          Admin
+        </Anchor>
+      </Stack>
+    </Center>
   );
 }

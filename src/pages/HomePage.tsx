@@ -5,8 +5,9 @@
  *   - server state via TanStack Query (schema-meta query; validate/upload/
  *     download/email/template mutations)
  *   - client table state & validation lifecycle via usePhoneTable
- *   - errors surface through the centralized Query error handler (toasts);
- *     success/among-valid messages are raised per-mutation.
+ *   - errors surface through the centralized Query error handler (Mantine
+ *     notifications); success/among-valid messages are raised per-mutation
+ *   - UI built with Mantine (Container/Stack/Group/Title/Text/Alert/TextInput).
  *
  * The "validate before export" rule is enforced by usePhoneTable.canExport
  * (buttons) and again on the backend.
@@ -15,6 +16,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { Alert, Anchor, Button, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core';
 import { Toolbar } from '../components/Toolbar';
 import { DataGrid } from '../components/DataGrid';
 import { StatusBanner } from '../components/StatusBanner';
@@ -28,7 +30,7 @@ import {
   sendEmailReport,
   validateTable,
 } from '../api/phoneMappingApi';
-import { notify } from '../stores/notificationStore';
+import { notify } from '../lib/notify';
 import { saveBlob } from '../utils/download';
 import { toExcelFilename } from '../utils/filename';
 import { inspectUploadColumns } from '../utils/uploadNormalizer';
@@ -44,7 +46,6 @@ export default function HomePage() {
   const table = usePhoneTable();
 
   const [emailOpen, setEmailOpen] = useState(false);
-  // User-entered title for the whole Excel file → download filename + email.
   const [sheetTitle, setSheetTitle] = useState('');
   const title = sheetTitle.trim();
 
@@ -96,7 +97,6 @@ export default function HomePage() {
         notify(
           `Validation failed: ${errorCount} invalid cell(s). Hover the red cells for details.`,
           'error',
-          7000,
         );
       }
     },
@@ -119,7 +119,6 @@ export default function HomePage() {
     },
   });
 
-  // Any in-flight action blocks the toolbar.
   const busy =
     schemaQuery.isLoading ||
     uploadMutation.isPending ||
@@ -135,82 +134,74 @@ export default function HomePage() {
   ).length;
 
   return (
-    <div className="app">
-      <header className="app__header">
-        <div>
-          <h1 className="app__title">Company Phone Mapping</h1>
-          <p className="app__subtitle">
-            Map each phone to its office, location, department and importance — then validate,
-            export, or email the report.
-          </p>
-        </div>
-        <Link className="btn admin-link" to="/admin" title="Site availability settings">
-          ⚙ Admin
-        </Link>
-      </header>
+    <Container size="lg" py="lg">
+      <Stack gap="md">
+        <Group justify="space-between" align="flex-start" wrap="nowrap">
+          <div>
+            <Title order={1} fz="1.6rem">
+              Company Phone Mapping
+            </Title>
+            <Text c="dimmed" size="sm" maw="60ch">
+              Map each phone to its office, location, department and importance — then validate,
+              export, or email the report.
+            </Text>
+          </div>
+          <Button component={Link} to="/admin" variant="default">
+            ⚙ Admin
+          </Button>
+        </Group>
 
-      {schemaQuery.isError && (
-        <div className="status-banner status-banner--warning" role="status">
-          <span className="status-banner__dot" aria-hidden="true" />
-          <span>
+        {schemaQuery.isError && (
+          <Alert color="yellow" variant="light">
             Could not load dropdown options (
             {schemaQuery.error instanceof Error ? schemaQuery.error.message : 'error'}).{' '}
-            <button type="button" className="link-btn" onClick={() => void schemaQuery.refetch()}>
+            <Anchor component="button" type="button" onClick={() => void schemaQuery.refetch()}>
               Retry
-            </button>
-          </span>
-        </div>
-      )}
+            </Anchor>
+          </Alert>
+        )}
 
-      <div className="sheet-title-bar">
-        <label className="sheet-title-field">
-          <span className="sheet-title-label">Excel file title</span>
-          <input
-            type="text"
-            className="sheet-title-input"
-            value={sheetTitle}
-            onChange={(e) => setSheetTitle(e.target.value)}
-            placeholder="e.g. Q3 Phone Mappings"
-          />
-        </label>
-        <span className="sheet-title-hint">
-          Used as the downloaded file name{title ? ` (${toExcelFilename(title)})` : ''} and the
-          email report.
-        </span>
-      </div>
+        <TextInput
+          label="Excel file title"
+          placeholder="e.g. Q3 Phone Mappings"
+          value={sheetTitle}
+          onChange={(e) => setSheetTitle(e.currentTarget.value)}
+          description={`Used as the downloaded file name${
+            title ? ` (${toExcelFilename(title)})` : ''
+          } and the email report.`}
+        />
 
-      <Toolbar
-        canExport={table.canExport}
-        busy={busy}
-        onUploadFile={(file) => uploadMutation.mutate(file)}
-        onAddRow={table.addRow}
-        onDownloadTemplate={() => templateMutation.mutate()}
-        onValidate={() => validateMutation.mutate()}
-        onDownloadExcel={() => downloadMutation.mutate()}
-        onOpenEmail={() => setEmailOpen(true)}
-      />
+        <Toolbar
+          canExport={table.canExport}
+          busy={busy}
+          onUploadFile={(file) => uploadMutation.mutate(file)}
+          onAddRow={table.addRow}
+          onDownloadTemplate={() => templateMutation.mutate()}
+          onValidate={() => validateMutation.mutate()}
+          onDownloadExcel={() => downloadMutation.mutate()}
+          onOpenEmail={() => setEmailOpen(true)}
+        />
 
-      <StatusBanner
-        status={table.status}
-        totalErrors={table.totalErrors}
-        hasData={table.hasData}
-      />
+        <StatusBanner status={table.status} totalErrors={table.totalErrors} hasData={table.hasData} />
 
-      <DataGrid
-        rows={table.rows}
-        errorsById={table.errorsById}
-        schemaOptions={schemaQuery.data ?? {}}
-        onCellChange={table.updateCell}
-        onDeleteRow={table.deleteRow}
-      />
+        <DataGrid
+          rows={table.rows}
+          errorsById={table.errorsById}
+          schemaOptions={schemaQuery.data ?? {}}
+          onCellChange={table.updateCell}
+          onDeleteRow={table.deleteRow}
+        />
 
-      <footer className="app__footer">
-        <span>
-          {table.rows.length} row{table.rows.length === 1 ? '' : 's'} · {table.totalErrors} error
-          {table.totalErrors === 1 ? '' : 's'}
-        </span>
-        <span className="app__hint">* required field</span>
-      </footer>
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            {table.rows.length} row{table.rows.length === 1 ? '' : 's'} · {table.totalErrors} error
+            {table.totalErrors === 1 ? '' : 's'}
+          </Text>
+          <Text size="sm" c="dimmed">
+            * required field
+          </Text>
+        </Group>
+      </Stack>
 
       <EmailDialog
         open={emailOpen}
@@ -218,9 +209,9 @@ export default function HomePage() {
         defaultSubject={title || undefined}
         rowCount={exportRowCount}
         sending={emailMutation.isPending}
-        onClose={() => (emailMutation.isPending ? null : setEmailOpen(false))}
+        onClose={() => (emailMutation.isPending ? undefined : setEmailOpen(false))}
         onSend={(params) => emailMutation.mutate(params)}
       />
-    </div>
+    </Container>
   );
 }

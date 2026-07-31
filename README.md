@@ -4,6 +4,10 @@ A modular **React + TypeScript** (Vite) interface for mapping every phone in you
 company and validating the data against your backend API before exporting or
 emailing it.
 
+**Frontend stack:** React Router (routing) · TanStack Query (server state +
+centralized error→toast) · Zustand (client state: notifications, preferences) ·
+Mantine (UI components, forms, modals, notifications, dates).
+
 For each phone number you record:
 
 | Field | Type | Notes |
@@ -102,32 +106,42 @@ the dev server can talk to it directly.
 ```
 src/
 ├── types.ts                  # shared, app-wide TypeScript types
+├── router.tsx                # centralized React Router (hash) route config
+├── theme.ts                  # Mantine theme
 ├── api/
 │   ├── client.ts            # fetch wrapper: base URL, JSON/blob, ApiError
 │   └── phoneMappingApi.ts   # one function per backend endpoint
 ├── config/
 │   ├── appConfig.ts         # API base URL + endpoint paths (env-driven)
 │   └── columns.ts           # ★ single source of truth for the columns
+├── layouts/
+│   └── AvailabilityLayout.tsx # schedule gate (Outlet) for the home route
+├── pages/
+│   ├── HomePage.tsx          # main phone-mapping page
+│   └── AdminPage.tsx         # availability schedule + offices editor
 ├── hooks/
-│   ├── useSchemaMeta.ts      # loads dropdown options from /schema-meta
-│   ├── useToasts.ts          # transient-notification state
+│   ├── queries.ts            # TanStack Query hooks (schema/availability/…)
 │   └── usePhoneTable.ts      # ★ table state + validation state machine
+├── lib/
+│   ├── queryClient.ts        # QueryClient + centralized error→toast + query keys
+│   └── notify.ts             # Mantine-notifications adapter
+├── stores/
+│   ├── notificationStore.ts  # (Zustand) — retired in the Mantine step
+│   └── preferencesStore.ts   # (Zustand) persisted prefs: admin token
 ├── utils/
 │   ├── validationAdapter.ts  # normalizes /validate-table responses → cell errors
-│   ├── uploadNormalizer.ts   # maps uploaded headers onto canonical column keys
+│   ├── uploadNormalizer.ts   # header→column mapping + column-mismatch check
 │   ├── rowFactory.ts         # create/shape rows; strip UI-only fields for payloads
+│   ├── filename.ts           # sheet title → safe .xlsx filename
 │   └── download.ts           # browser "Save As" for blobs
 ├── components/
-│   ├── Toolbar.tsx           # all actions; export buttons gated by canExport
-│   ├── DataGrid.tsx          # the editable table
-│   ├── EditableCell.tsx      # per-type editor + red state + tooltip
-│   ├── StatusBanner.tsx      # plain-language validation status
-│   ├── EmailDialog.tsx       # recipient/subject/message modal
-│   └── Toast.tsx             # presentational toast stack
-├── styles/global.css         # design tokens + all styling
+│   ├── Toolbar.tsx           # Mantine buttons; export gated by canExport
+│   ├── DataGrid.tsx          # Mantine Table
+│   ├── EditableCell.tsx      # Select/TextInput + red error + hover Tooltip
+│   ├── StatusBanner.tsx      # Mantine Alert
+│   └── EmailDialog.tsx       # Mantine Modal + useForm
 ├── vite-env.d.ts             # typings for import.meta.env
-├── App.tsx                   # composition root (wires hooks ↔ components)
-└── main.tsx                  # React entry point
+└── main.tsx                  # entry: Query · Mantine · Modals · Notifications · Router
 ```
 
 ★ = the two files you will most often edit. Shared data types live in
@@ -175,12 +189,17 @@ tolerant about exact response shapes. Adjust these spots if needed:
 
 ## Design notes
 
-- **No grid library.** A small custom table keeps the red-cell + tooltip behavior
-  and the validation gating fully under our control, with zero heavy deps
-  (React + Vite only).
-- **Separation of concerns.** Transport (`api/`), business rules (`hooks/`),
-  pure helpers (`utils/`) and presentation (`components/`) are isolated, so each
-  is easy to change or test independently.
+- **Layered stack.** Routing (React Router) · server state + centralized
+  error→toast (TanStack Query) · client state (Zustand: preferences) · UI
+  (Mantine components/forms/modals/notifications/dates). Transport (`api/`),
+  business rules (`hooks/`), pure helpers (`utils/`) and presentation
+  (`components/`) stay isolated.
+- **Validate-before-export** is enforced in one place (`usePhoneTable.canExport`)
+  and again on the backend.
+- **Red cells + tooltips.** Invalid cells get a Mantine `error` border and a
+  hover `Tooltip` carrying the backend's exact message. Integer cells use a text
+  input so bad values (e.g. `abc`) persist and fail validation instead of being
+  silently coerced.
 - **Stable row identity.** Rows carry an internal `_id` (stripped before any API
   call) so deleting/reordering can never paint the wrong cell red.
 ```

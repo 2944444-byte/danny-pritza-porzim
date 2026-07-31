@@ -1,13 +1,12 @@
 /**
  * DataGrid.tsx
  * -----------------------------------------------------------------------------
- * Renders the editable table: a header row derived from COLUMNS, one row per
- * data record (each with a delete button), and an EditableCell per column.
- *
- * A "dumb" presentational component — all state and behavior come in via props
- * from usePhoneTable, which keeps it trivial to test and restyle.
+ * The editable table (Mantine Table). Header derived from COLUMNS, one row per
+ * record with a delete action, and an EditableCell per column. Presentational —
+ * all state/behavior arrive via props from usePhoneTable.
  */
 
+import { ActionIcon, Table, Text } from '@mantine/core';
 import { COLUMNS } from '../config/columns';
 import { EditableCell } from './EditableCell';
 import type { CellErrorsById, CellValue, GridRow, SchemaMeta } from '../types';
@@ -28,35 +27,37 @@ export function DataGrid({
   onDeleteRow,
 }: DataGridProps) {
   return (
-    <div className="grid-scroll">
-      <table className="data-grid">
-        <thead>
-          <tr>
-            <th className="row-index-head" scope="col">
+    <Table.ScrollContainer minWidth={820}>
+      <Table verticalSpacing="xs" horizontalSpacing="xs" withTableBorder withColumnBorders>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th w={40} ta="center">
               #
-            </th>
+            </Table.Th>
             {COLUMNS.map((col) => (
-              <th key={col.key} scope="col">
+              <Table.Th key={col.key}>
                 {col.label}
                 {col.required && (
-                  <span className="required-mark" title="Required">
+                  <Text span c="red" title="Required">
                     {' '}
                     *
-                  </span>
+                  </Text>
                 )}
-              </th>
+              </Table.Th>
             ))}
-            <th className="actions-head" scope="col">
+            <Table.Th w={64} ta="center">
               Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
           {rows.map((row, index) => {
             const rowErrors = errorsById[row._id] ?? {};
             return (
-              <tr key={row._id} className={Object.keys(rowErrors).length ? 'row--error' : ''}>
-                <td className="row-index">{index + 1}</td>
+              <Table.Tr key={row._id}>
+                <Table.Td ta="center" c="dimmed">
+                  {index + 1}
+                </Table.Td>
                 {COLUMNS.map((col) => (
                   <EditableCell
                     key={col.key}
@@ -72,22 +73,22 @@ export function DataGrid({
                     onChange={onCellChange}
                   />
                 ))}
-                <td className="row-actions">
-                  <button
-                    type="button"
-                    className="btn btn--icon btn--danger"
+                <Table.Td ta="center">
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
                     onClick={() => onDeleteRow(row._id)}
                     aria-label={`Delete row ${index + 1}`}
                     title="Delete this row"
                   >
                     ✕
-                  </button>
-                </td>
-              </tr>
+                  </ActionIcon>
+                </Table.Td>
+              </Table.Tr>
             );
           })}
-        </tbody>
-      </table>
-    </div>
+        </Table.Tbody>
+      </Table>
+    </Table.ScrollContainer>
   );
 }

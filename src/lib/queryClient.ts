@@ -8,7 +8,7 @@
  */
 
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import { notify } from '../stores/notificationStore';
+import { notify } from './notify';
 
 function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';
@@ -16,10 +16,10 @@ function toMessage(error: unknown): string {
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error) => notify(toMessage(error), 'error', 7000),
+    onError: (error) => notify(toMessage(error), 'error'),
   }),
   mutationCache: new MutationCache({
-    onError: (error) => notify(toMessage(error), 'error', 7000),
+    onError: (error) => notify(toMessage(error), 'error'),
   }),
   defaultOptions: {
     queries: {

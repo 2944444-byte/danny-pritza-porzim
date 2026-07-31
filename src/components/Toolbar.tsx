@@ -1,17 +1,12 @@
 /**
  * Toolbar.tsx
  * -----------------------------------------------------------------------------
- * The action bar holding every operation the manager needs:
- *   Upload Excel · Add Row · Download Template · Validate Data ·
- *   Download Excel · Send Email Report
- *
- * (Delete-row lives per-row inside the grid.)
- *
- * Export actions (Download Excel / Send Email) are DISABLED until validation
- * passes — enforced here via `canExport` and, defensively, again in the hook.
+ * Action bar: Upload Excel · Add Row · Download Template · Validate Data ·
+ * Download Excel · Send Email Report. Built with Mantine Buttons/Group and a
+ * FileButton for uploads. Export actions are disabled until validation passes.
  */
 
-import { useRef, type ChangeEvent } from 'react';
+import { Button, FileButton, Group } from '@mantine/core';
 
 export interface ToolbarProps {
   canExport: boolean;
@@ -34,70 +29,37 @@ export function Toolbar({
   onDownloadExcel,
   onOpenEmail,
 }: ToolbarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onUploadFile(file);
-    // Reset so selecting the same file again re-triggers onChange.
-    e.target.value = '';
-  };
-
-  const exportHint = canExport
-    ? undefined
-    : 'Validate the data successfully to enable this action.';
+  const exportHint = canExport ? undefined : 'Validate the data successfully to enable this action.';
 
   return (
-    <div className="toolbar" role="toolbar" aria-label="Table actions">
-      {/* Hidden native file input, driven by the styled button. */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx,.xls"
-        className="visually-hidden"
-        onChange={handleFileChange}
-      />
-
-      <div className="toolbar__group">
-        <button
-          type="button"
-          className="btn"
-          disabled={busy}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          ⬆ Upload Excel
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={onAddRow}>
+    <Group justify="space-between" wrap="wrap" gap="sm">
+      <Group gap="sm">
+        <FileButton accept=".xlsx,.xls" onChange={(file) => file && onUploadFile(file)}>
+          {(props) => (
+            <Button variant="default" disabled={busy} {...props}>
+              ⬆ Upload Excel
+            </Button>
+          )}
+        </FileButton>
+        <Button variant="default" disabled={busy} onClick={onAddRow}>
           ＋ Add Row
-        </button>
-        <button type="button" className="btn" disabled={busy} onClick={onDownloadTemplate}>
+        </Button>
+        <Button variant="default" disabled={busy} onClick={onDownloadTemplate}>
           ⬇ Download Template
-        </button>
-      </div>
+        </Button>
+      </Group>
 
-      <div className="toolbar__group toolbar__group--right">
-        <button type="button" className="btn btn--primary" disabled={busy} onClick={onValidate}>
+      <Group gap="sm">
+        <Button disabled={busy} onClick={onValidate}>
           ✔ Validate Data
-        </button>
-        <button
-          type="button"
-          className="btn btn--accent"
-          disabled={busy || !canExport}
-          onClick={onDownloadExcel}
-          title={exportHint}
-        >
+        </Button>
+        <Button color="teal" disabled={busy || !canExport} title={exportHint} onClick={onDownloadExcel}>
           ⬇ Download Excel
-        </button>
-        <button
-          type="button"
-          className="btn btn--accent"
-          disabled={busy || !canExport}
-          onClick={onOpenEmail}
-          title={exportHint}
-        >
+        </Button>
+        <Button color="teal" disabled={busy || !canExport} title={exportHint} onClick={onOpenEmail}>
           ✉ Send Email Report
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Group>
+    </Group>
   );
 }

@@ -10,6 +10,7 @@
  */
 
 import { Outlet, useNavigate } from 'react-router-dom';
+import { Center, Loader } from '@mantine/core';
 import { ClosedPage } from '../components/ClosedPage';
 import { useAvailabilityQuery } from '../hooks/queries';
 
@@ -21,9 +22,9 @@ export default function AvailabilityLayout() {
 
   if (loading && !availability) {
     return (
-      <div className="centered-screen" role="status">
-        <span>Loading…</span>
-      </div>
+      <Center mih="100vh" role="status">
+        <Loader />
+      </Center>
     );
   }
 

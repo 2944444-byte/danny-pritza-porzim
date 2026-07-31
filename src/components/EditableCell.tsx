@@ -1,18 +1,17 @@
 /**
  * EditableCell.tsx
  * -----------------------------------------------------------------------------
- * Renders a single editable cell whose editor depends on the column type:
- *   - dropdown → <select> populated from /schema-meta (current value kept
- *                selectable even if not in the option list, so bad uploaded data
- *                stays visible and fixable)
- *   - integer  → numeric <input>
- *   - wkt/text/phone → text <input>
+ * One editable table cell (Mantine). Dropdown columns render a <Select> filled
+ * from /schema-meta; everything else renders a <TextInput> (integers too, so a
+ * bad value like "abc" is preserved and caught by validation rather than being
+ * silently coerced away).
  *
- * Error presentation (per the requirements): an invalid cell turns red, and
- * hovering shows the backend's error message (native `title` + styled tooltip).
+ * Error presentation: invalid cells get a red border (Mantine `error`) and a
+ * hover Tooltip carrying the backend's exact error message.
  */
 
-import { memo, type ChangeEvent } from 'react';
+import { memo } from 'react';
+import { Select, Table, TextInput, Tooltip } from '@mantine/core';
 import type { CellValue, ColumnDef } from '../types';
 
 export interface EditableCellProps {
@@ -33,76 +32,59 @@ function EditableCellBase({
   onChange,
 }: EditableCellProps) {
   const hasError = Boolean(error);
-  const commonClass = `cell-input${hasError ? ' cell-input--error' : ''}`;
-  const handle = (e: ChangeEvent<HTMLSelectElement | HTMLInputElement>) =>
-    onChange(rowId, column.key, e.target.value);
-
+  const strValue = value === undefined || value === null ? '' : String(value);
   const isDropdown =
     column.type === 'dropdown' || (dropdownOptions !== undefined && dropdownOptions.length > 0);
 
-  let editor: JSX.Element;
+  let control: JSX.Element;
   if (isDropdown) {
     const options = dropdownOptions ?? [];
-    const valueMissingFromOptions =
-      value !== '' && value != null && !options.includes(String(value));
-    editor = (
-      <select className={commonClass} value={value ?? ''} onChange={handle}>
-        <option value="" disabled>
-          {column.placeholder ?? 'Select…'}
-        </option>
-        {/* Preserve an out-of-range value so the user can see & fix it. */}
-        {valueMissingFromOptions && (
-          <option value={String(value)}>{String(value)} (invalid)</option>
-        )}
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
+    // Keep an out-of-range value visible & selectable so it can be fixed.
+    const data =
+      strValue && !options.includes(strValue) ? [...options, `${strValue}`] : options;
+    control = (
+      <Select
+        data={data}
+        value={strValue || null}
+        placeholder={column.placeholder ?? 'Select…'}
+        onChange={(v) => onChange(rowId, column.key, v ?? '')}
+        error={hasError}
+        comboboxProps={{ withinPortal: true }}
+        checkIconPosition="right"
+        allowDeselect={false}
+        size="sm"
+      />
     );
   } else {
-    editor = (
-      <input
-        type={column.type === 'integer' ? 'number' : 'text'}
-        className={commonClass}
-        value={value ?? ''}
+    control = (
+      <TextInput
+        value={strValue}
         placeholder={column.placeholder}
-        onChange={handle}
-        inputMode={
-          column.type === 'integer' || column.type === 'phone' ? 'numeric' : undefined
-        }
+        onChange={(e) => onChange(rowId, column.key, e.currentTarget.value)}
+        error={hasError}
+        inputMode={column.type === 'integer' || column.type === 'phone' ? 'numeric' : undefined}
+        size="sm"
       />
     );
   }
 
   return (
-    <td className={`cell${hasError ? ' cell--error' : ''}`}>
-      <div
-        className="cell-wrapper"
-        // Native tooltip — accessible and always available.
-        title={hasError ? error : undefined}
-        aria-invalid={hasError || undefined}
+    <Table.Td>
+      <Tooltip
+        label={error}
+        disabled={!hasError}
+        color="red"
+        multiline
+        w={260}
+        withArrow
+        position="top-start"
+        events={{ hover: true, focus: true, touch: true }}
       >
-        {editor}
-        {hasError && (
-          <>
-            {/* Visual marker + styled tooltip driven entirely by the API error. */}
-            <span className="cell-error-badge" aria-hidden="true">
-              !
-            </span>
-            <span className="cell-tooltip" role="tooltip">
-              {error}
-            </span>
-          </>
-        )}
-      </div>
-    </td>
+        <div>{control}</div>
+      </Tooltip>
+    </Table.Td>
   );
 }
 
-/**
- * Memoized to avoid re-rendering every cell on each keystroke elsewhere in the
- * grid. Re-renders only when this cell's value/error/options actually change.
- */
+/** Memoized so a keystroke in one cell doesn't re-render the whole grid. */
 export const EditableCell = memo(EditableCellBase);

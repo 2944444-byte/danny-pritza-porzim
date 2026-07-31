@@ -1,22 +1,41 @@
 /**
  * AdminPage.tsx
  * -----------------------------------------------------------------------------
- * Admin screen for controlling when the site is reachable. The admin enables
- * specific days and sets an open/close window for each. They can also set the
- * timezone and the (Hebrew) message users see while the site is closed.
+ * Admin screen for controlling when the site is reachable, plus the office
+ * dropdown list. Built with Mantine (Container/Stack/Group/Table/Switch/
+ * TimeInput/TextInput/Textarea/PasswordInput/Button). Reads via TanStack Query,
+ * writes via mutations (invalidating the relevant queries). The admin token is a
+ * persisted Zustand preference.
  *
- * Reachable at `#/admin`. It stays accessible even when the site is "closed",
- * so the admin can re-open it. Saving requires the admin token only if the
- * server has one configured (ADMIN_TOKEN); otherwise it's open.
+ * Reachable at `#/admin`, and stays reachable even while the site is "closed",
+ * so the admin can re-open it.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Container,
+  Divider,
+  Group,
+  Loader,
+  PasswordInput,
+  Stack,
+  Switch,
+  Table,
+  Text,
+  Textarea,
+  TextInput,
+  Title,
+} from '@mantine/core';
+import { TimeInput } from '@mantine/dates';
 import { saveSchedule, saveOffices } from '../api/phoneMappingApi';
 import { useScheduleQuery, useOfficesQuery, useAvailabilityQuery } from '../hooks/queries';
 import { queryKeys } from '../lib/queryClient';
-import { notify } from '../stores/notificationStore';
+import { notify } from '../lib/notify';
 import { usePreferencesStore } from '../stores/preferencesStore';
 import type { DaySchedule, Schedule } from '../types';
 
@@ -100,180 +119,160 @@ export default function AdminPage() {
   }, [availability]);
 
   return (
-    <div className="app admin">
-      <header className="app__header">
-        <div>
-          <h1 className="app__title">Admin · Site Availability</h1>
-          <p className="app__subtitle">
-            Choose which days and hours the site is reachable. Outside these times users see a
-            closed page and validation is disabled.
-          </p>
-        </div>
-        <Link className="btn" to="/">
-          ← Back to app
-        </Link>
-      </header>
+    <Container size="lg" py="lg">
+      <Stack gap="md">
+        <Group justify="space-between" align="flex-start" wrap="nowrap">
+          <div>
+            <Title order={1} fz="1.6rem">
+              Admin · Site Availability
+            </Title>
+            <Text c="dimmed" size="sm" maw="60ch">
+              Choose which days and hours the site is reachable. Outside these times users see a
+              closed page and validation is disabled.
+            </Text>
+          </div>
+          <Button component={Link} to="/" variant="default">
+            ← Back to app
+          </Button>
+        </Group>
 
-      {availability && (
-        <div
-          className={`status-banner status-banner--${availability.open ? 'success' : 'error'}`}
-          role="status"
-        >
-          <span className="status-banner__dot" aria-hidden="true" />
-          <span>{statusLabel}</span>
-        </div>
-      )}
+        {availability && (
+          <Alert color={availability.open ? 'teal' : 'red'} variant="light" role="status">
+            {statusLabel}
+          </Alert>
+        )}
 
-      {loading && <p>Loading schedule…</p>}
+        {loading && (
+          <Group gap="xs">
+            <Loader size="sm" />
+            <Text size="sm">Loading settings…</Text>
+          </Group>
+        )}
 
-      {schedule && (
-        <>
-          <table className="schedule-table">
-            <thead>
-              <tr>
-                <th>Day</th>
-                <th>Open?</th>
-                <th>From</th>
-                <th>To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {DAY_LABELS.map((label, idx) => {
-                const key = String(idx);
-                const day = schedule.days[key];
-                if (!day) return null;
-                return (
-                  <tr key={key} className={day.enabled ? '' : 'schedule-row--off'}>
-                    <td>{label}</td>
-                    <td>
-                      <label className="switch">
-                        <input
-                          type="checkbox"
+        {schedule && (
+          <>
+            <Table withTableBorder>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Day</Table.Th>
+                  <Table.Th>Open?</Table.Th>
+                  <Table.Th>From</Table.Th>
+                  <Table.Th>To</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {DAY_LABELS.map((label, idx) => {
+                  const key = String(idx);
+                  const day = schedule.days[key];
+                  if (!day) return null;
+                  return (
+                    <Table.Tr key={key}>
+                      <Table.Td>{label}</Table.Td>
+                      <Table.Td>
+                        <Switch
                           checked={day.enabled}
-                          onChange={(e) => updateDay(key, { enabled: e.target.checked })}
+                          onChange={(e) => updateDay(key, { enabled: e.currentTarget.checked })}
+                          label={day.enabled ? 'Open' : 'Closed'}
                         />
-                        <span>{day.enabled ? 'Open' : 'Closed'}</span>
-                      </label>
-                    </td>
-                    <td>
-                      <input
-                        type="time"
-                        className="form__input"
-                        value={day.open}
-                        disabled={!day.enabled}
-                        onChange={(e) => updateDay(key, { open: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="time"
-                        className="form__input"
-                        value={day.close}
-                        disabled={!day.enabled}
-                        onChange={(e) => updateDay(key, { close: e.target.value })}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </Table.Td>
+                      <Table.Td>
+                        <TimeInput
+                          value={day.open}
+                          disabled={!day.enabled}
+                          onChange={(e) => updateDay(key, { open: e.currentTarget.value })}
+                          w={130}
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <TimeInput
+                          value={day.close}
+                          disabled={!day.enabled}
+                          onChange={(e) => updateDay(key, { close: e.currentTarget.value })}
+                          w={130}
+                        />
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
+              </Table.Tbody>
+            </Table>
 
-          <div className="admin-fields">
-            <label className="form__field">
-              <span className="form__label">Timezone</span>
-              <input
-                type="text"
-                className="form__input"
-                value={schedule.timezone}
-                onChange={(e) => setSchedule({ ...schedule, timezone: e.target.value })}
+            <Group grow align="flex-start">
+              <TextInput
+                label="Timezone"
                 placeholder="Asia/Jerusalem"
+                value={schedule.timezone}
+                onChange={(e) => setSchedule({ ...schedule, timezone: e.currentTarget.value })}
               />
-            </label>
-
-            <label className="form__field">
-              <span className="form__label">Closed message (shown to users)</span>
-              <textarea
-                className="form__input form__textarea"
+              <Textarea
+                label="Closed message (shown to users)"
                 dir="rtl"
-                rows={2}
+                autosize
+                minRows={2}
                 value={schedule.closed_message}
-                onChange={(e) => setSchedule({ ...schedule, closed_message: e.target.value })}
+                onChange={(e) => setSchedule({ ...schedule, closed_message: e.currentTarget.value })}
               />
-            </label>
-
-            <label className="form__field">
-              <span className="form__label">
-                Admin token <span className="form__hint">(only if the server requires one)</span>
-              </span>
-              <input
-                type="password"
-                className="form__input"
-                value={adminToken}
-                onChange={(e) => setAdminToken(e.target.value)}
+              <PasswordInput
+                label="Admin token"
+                description="Only if the server requires one"
                 placeholder="leave blank if not configured"
                 autoComplete="off"
+                value={adminToken}
+                onChange={(e) => setAdminToken(e.currentTarget.value)}
               />
-            </label>
-          </div>
+            </Group>
 
-          <div className="admin-actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Save schedule'}
-            </button>
-          </div>
+            <Group justify="flex-end">
+              <Button onClick={handleSave} loading={saving}>
+                Save schedule
+              </Button>
+            </Group>
 
-          <section className="admin-section">
-            <h2 className="admin-section__title">Office dropdown options</h2>
-            <p className="app__subtitle">
-              The list of offices users can choose for “Office Name”. Saving updates the dropdown
-              and what counts as a valid office during validation.
-            </p>
+            <Divider my="sm" />
 
-            <div className="offices-list">
+            <div>
+              <Title order={2} fz="1.15rem">
+                Office dropdown options
+              </Title>
+              <Text c="dimmed" size="sm" maw="60ch">
+                The list of offices users can choose for “Office Name”. Saving updates the dropdown
+                and what counts as a valid office during validation.
+              </Text>
+            </div>
+
+            <Stack gap="xs" maw={480}>
               {offices.map((office, index) => (
-                <div className="office-row" key={index}>
-                  <input
-                    type="text"
-                    className="form__input"
-                    value={office}
-                    onChange={(e) => updateOffice(index, e.target.value)}
+                <Group key={index} gap="xs" wrap="nowrap">
+                  <TextInput
+                    flex={1}
                     placeholder="Office name"
+                    value={office}
+                    onChange={(e) => updateOffice(index, e.currentTarget.value)}
                   />
-                  <button
-                    type="button"
-                    className="btn btn--danger btn--icon"
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
                     onClick={() => removeOffice(index)}
                     aria-label={`Remove office ${index + 1}`}
                     title="Remove"
                   >
                     ✕
-                  </button>
-                </div>
+                  </ActionIcon>
+                </Group>
               ))}
-            </div>
+            </Stack>
 
-            <div className="offices-actions">
-              <button type="button" className="btn" onClick={addOffice}>
+            <Group justify="space-between" maw={480}>
+              <Button variant="default" onClick={addOffice}>
                 ＋ Add office
-              </button>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={handleSaveOffices}
-                disabled={savingOffices}
-              >
-                {savingOffices ? 'Saving…' : 'Save offices'}
-              </button>
-            </div>
-          </section>
-        </>
-      )}
-    </div>
+              </Button>
+              <Button onClick={handleSaveOffices} loading={savingOffices}>
+                Save offices
+              </Button>
+            </Group>
+          </>
+        )}
+      </Stack>
+    </Container>
   );
 }
