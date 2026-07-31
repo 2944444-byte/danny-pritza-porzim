@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   fetchSchedule,
   fetchAvailability,
@@ -129,9 +130,9 @@ export default function AdminPage() {
             closed page and validation is disabled.
           </p>
         </div>
-        <a className="btn" href="#/">
+        <Link className="btn" to="/">
           ← Back to app
-        </a>
+        </Link>
       </header>
 
       {availability && (

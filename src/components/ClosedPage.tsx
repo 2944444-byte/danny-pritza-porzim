@@ -10,9 +10,11 @@
 export interface ClosedPageProps {
   message: string;
   onRetry: () => void;
+  /** Navigate to the admin page (routing is owned by the parent). */
+  onAdmin: () => void;
 }
 
-export function ClosedPage({ message, onRetry }: ClosedPageProps) {
+export function ClosedPage({ message, onRetry, onAdmin }: ClosedPageProps) {
   return (
     <div className="closed-page" dir="rtl">
       <div className="closed-card">
@@ -24,9 +26,9 @@ export function ClosedPage({ message, onRetry }: ClosedPageProps) {
           נסו שוב
         </button>
       </div>
-      <a className="closed-admin-link" href="#/admin" dir="ltr">
+      <button type="button" className="closed-admin-link" onClick={onAdmin} dir="ltr">
         Admin
-      </a>
+      </button>
     </div>
   );
 }

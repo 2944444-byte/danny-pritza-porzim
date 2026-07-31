@@ -13,26 +13,27 @@
  */
 
 import { useCallback, useState } from 'react';
-import { Toolbar } from './components/Toolbar';
-import { DataGrid } from './components/DataGrid';
-import { StatusBanner } from './components/StatusBanner';
-import { EmailDialog } from './components/EmailDialog';
-import { ToastStack } from './components/Toast';
-import { useToasts } from './hooks/useToasts';
-import { usePhoneTable } from './hooks/usePhoneTable';
-import { useSchemaMeta } from './hooks/useSchemaMeta';
-import { uploadExcel, downloadTemplate as apiDownloadTemplate } from './api/phoneMappingApi';
-import { saveBlob } from './utils/download';
-import { toExcelFilename } from './utils/filename';
-import { inspectUploadColumns } from './utils/uploadNormalizer';
-import { COLUMNS } from './config/columns';
-import { DEFAULT_TEMPLATE_FILENAME } from './config/appConfig';
-import type { EmailParams } from './types';
+import { Link } from 'react-router-dom';
+import { Toolbar } from '../components/Toolbar';
+import { DataGrid } from '../components/DataGrid';
+import { StatusBanner } from '../components/StatusBanner';
+import { EmailDialog } from '../components/EmailDialog';
+import { ToastStack } from '../components/Toast';
+import { useToasts } from '../hooks/useToasts';
+import { usePhoneTable } from '../hooks/usePhoneTable';
+import { useSchemaMeta } from '../hooks/useSchemaMeta';
+import { uploadExcel, downloadTemplate as apiDownloadTemplate } from '../api/phoneMappingApi';
+import { saveBlob } from '../utils/download';
+import { toExcelFilename } from '../utils/filename';
+import { inspectUploadColumns } from '../utils/uploadNormalizer';
+import { COLUMNS } from '../config/columns';
+import { DEFAULT_TEMPLATE_FILENAME } from '../config/appConfig';
+import type { EmailParams } from '../types';
 
 /** The manager's email, injected at build/runtime if available (optional). */
 const DEFAULT_MANAGER_EMAIL = import.meta.env.VITE_MANAGER_EMAIL || '';
 
-export default function App() {
+export default function HomePage() {
   const { options: schemaOptions, loading: schemaLoading, error: schemaError, reload } =
     useSchemaMeta();
   const table = usePhoneTable();
@@ -161,9 +162,9 @@ export default function App() {
             export, or email the report.
           </p>
         </div>
-        <a className="btn admin-link" href="#/admin" title="Site availability settings">
+        <Link className="btn admin-link" to="/admin" title="Site availability settings">
           ⚙ Admin
-        </a>
+        </Link>
       </header>
 
       {schemaError && (

@@ -580,6 +580,10 @@ select.cell-input {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.85rem;
   text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 .closed-admin-link:hover {
   color: #fff;
