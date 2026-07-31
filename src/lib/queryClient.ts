@@ -8,7 +8,7 @@
  */
 
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
-import { notify } from './notify';
+import { notify } from '../stores/notificationStore';
 
 function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';

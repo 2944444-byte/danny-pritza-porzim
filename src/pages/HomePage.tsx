@@ -28,7 +28,7 @@ import {
   sendEmailReport,
   validateTable,
 } from '../api/phoneMappingApi';
-import { notify } from '../lib/notify';
+import { notify } from '../stores/notificationStore';
 import { saveBlob } from '../utils/download';
 import { toExcelFilename } from '../utils/filename';
 import { inspectUploadColumns } from '../utils/uploadNormalizer';

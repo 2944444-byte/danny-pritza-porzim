@@ -2,11 +2,11 @@
  * Toast.tsx
  * -----------------------------------------------------------------------------
  * Presentational toast stack. Reads the active toasts from the app-wide
- * notification store (src/lib/notify.ts) and is mounted once at the app root, so
- * notifications appear on every route.
+ * notification store (Zustand, src/stores/notificationStore.ts) and is mounted
+ * once at the app root, so notifications appear on every route.
  */
 
-import { useToasts, dismiss } from '../lib/notify';
+import { useToasts, dismiss } from '../stores/notificationStore';
 
 export function ToastStack() {
   const toasts = useToasts();

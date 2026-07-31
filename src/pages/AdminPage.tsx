@@ -16,12 +16,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { saveSchedule, saveOffices } from '../api/phoneMappingApi';
 import { useScheduleQuery, useOfficesQuery, useAvailabilityQuery } from '../hooks/queries';
 import { queryKeys } from '../lib/queryClient';
-import { notify } from '../lib/notify';
+import { notify } from '../stores/notificationStore';
+import { usePreferencesStore } from '../stores/preferencesStore';
 import type { DaySchedule, Schedule } from '../types';
 
 // 0 = Sunday … 6 = Saturday (matches the backend's day keys).
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const ADMIN_TOKEN_STORAGE_KEY = 'phoneMapping.adminToken';
 
 export default function AdminPage() {
   const queryClient = useQueryClient();
@@ -29,12 +29,13 @@ export default function AdminPage() {
   const officesQuery = useOfficesQuery();
   const availabilityQuery = useAvailabilityQuery();
 
+  // Admin token is a persisted client preference (Zustand).
+  const adminToken = usePreferencesStore((s) => s.adminToken);
+  const setAdminToken = usePreferencesStore((s) => s.setAdminToken);
+
   // Editable local copies, seeded from the queries once they load.
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [offices, setOffices] = useState<string[]>([]);
-  const [adminToken, setAdminToken] = useState<string>(
-    () => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '',
-  );
 
   useEffect(() => {
     if (scheduleQuery.data) setSchedule(scheduleQuery.data);
@@ -45,7 +46,6 @@ export default function AdminPage() {
 
   const loading = scheduleQuery.isLoading || officesQuery.isLoading;
   const availability = availabilityQuery.data ?? null;
-  const persistToken = () => localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
 
   // --- Offices editor ---
   const updateOffice = (index: number, value: string) =>
@@ -66,7 +66,6 @@ export default function AdminPage() {
   const scheduleMutation = useMutation({
     mutationFn: (next: Schedule) => saveSchedule(next, adminToken || undefined),
     onSuccess: (saved) => {
-      persistToken();
       setSchedule(saved);
       queryClient.invalidateQueries({ queryKey: queryKeys.schedule });
       queryClient.invalidateQueries({ queryKey: queryKeys.availability });
@@ -77,7 +76,6 @@ export default function AdminPage() {
   const officesMutation = useMutation({
     mutationFn: (next: string[]) => saveOffices(next, adminToken || undefined),
     onSuccess: (saved) => {
-      persistToken();
       setOffices(saved);
       queryClient.invalidateQueries({ queryKey: queryKeys.offices });
       queryClient.invalidateQueries({ queryKey: queryKeys.schemaMeta });
