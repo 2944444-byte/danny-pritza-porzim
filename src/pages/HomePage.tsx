@@ -1,28 +1,34 @@
 /**
- * App.tsx
+ * HomePage.tsx
  * -----------------------------------------------------------------------------
- * Top-level container that composes the feature:
- *   - loads dropdown options (useSchemaMeta)
- *   - owns table state & validation lifecycle (usePhoneTable)
- *   - wires toolbar/grid/dialog handlers to the API
- *   - surfaces results via toasts and the status banner
+ * The main phone-mapping page.
+ *   - server state via TanStack Query (schema-meta query; validate/upload/
+ *     download/email/template mutations)
+ *   - client table state & validation lifecycle via usePhoneTable
+ *   - errors surface through the centralized Query error handler (toasts);
+ *     success/among-valid messages are raised per-mutation.
  *
- * App stays thin: it orchestrates hooks and components but delegates all rules
- * (e.g. "must validate before export") to usePhoneTable, and all transport to
- * the api/ layer.
+ * The "validate before export" rule is enforced by usePhoneTable.canExport
+ * (buttons) and again on the backend.
  */
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
 import { Toolbar } from '../components/Toolbar';
 import { DataGrid } from '../components/DataGrid';
 import { StatusBanner } from '../components/StatusBanner';
 import { EmailDialog } from '../components/EmailDialog';
-import { ToastStack } from '../components/Toast';
-import { useToasts } from '../hooks/useToasts';
 import { usePhoneTable } from '../hooks/usePhoneTable';
-import { useSchemaMeta } from '../hooks/useSchemaMeta';
-import { uploadExcel, downloadTemplate as apiDownloadTemplate } from '../api/phoneMappingApi';
+import { useSchemaMetaQuery } from '../hooks/queries';
+import {
+  uploadExcel,
+  downloadTemplate,
+  downloadExcel,
+  sendEmailReport,
+  validateTable,
+} from '../api/phoneMappingApi';
+import { notify } from '../lib/notify';
 import { saveBlob } from '../utils/download';
 import { toExcelFilename } from '../utils/filename';
 import { inspectUploadColumns } from '../utils/uploadNormalizer';
@@ -34,117 +40,93 @@ import type { EmailParams } from '../types';
 const DEFAULT_MANAGER_EMAIL = import.meta.env.VITE_MANAGER_EMAIL || '';
 
 export default function HomePage() {
-  const { options: schemaOptions, loading: schemaLoading, error: schemaError, reload } =
-    useSchemaMeta();
+  const schemaQuery = useSchemaMetaQuery();
   const table = usePhoneTable();
-  const { toasts, notify, dismiss } = useToasts();
 
-  // `busy` blocks the toolbar during any in-flight network action.
-  const [busy, setBusy] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
-  const [sending, setSending] = useState(false);
   // User-entered title for the whole Excel file → download filename + email.
   const [sheetTitle, setSheetTitle] = useState('');
+  const title = sheetTitle.trim();
 
-  /** Run an async action with shared busy state + uniform error toasts. */
-  const runAction = useCallback(
-    async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
-      setBusy(true);
-      try {
-        return await fn();
-      } catch (e) {
-        notify(e instanceof Error ? e.message : 'Something went wrong.', 'error', 7000);
-        return undefined;
-      } finally {
-        setBusy(false);
+  // --- Mutations ------------------------------------------------------------
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const { rows, columns } = await uploadExcel(file);
+      // Reject files whose columns don't match the schema, with an explanation.
+      // (Cell *values* are NOT checked — right columns / bad values still import
+      // and fail validation.)
+      const { missing, unknownHeaders } = inspectUploadColumns(rows, columns);
+      if (missing.length > 0) {
+        const expected = COLUMNS.map((c) => c.label).join(', ');
+        const miss = missing.map((c) => c.label).join(', ');
+        throw new Error(
+          `Upload failed — the file's columns don't match. ` +
+            `Missing required column(s): ${miss}. Expected columns: ${expected}.`,
+        );
+      }
+      return { rows, unknownHeaders, fileName: file.name };
+    },
+    onSuccess: ({ rows, unknownHeaders, fileName }) => {
+      table.loadUploadedRows(rows);
+      let msg = `Loaded ${rows.length} row(s) from “${fileName}”. Please validate.`;
+      if (unknownHeaders.length > 0) {
+        msg += ` (Ignored unrecognized column(s): ${unknownHeaders.join(', ')}.)`;
+      }
+      notify(msg, 'success');
+    },
+  });
+
+  const templateMutation = useMutation({
+    mutationFn: downloadTemplate,
+    onSuccess: ({ blob, filename }) => {
+      saveBlob(blob, filename || DEFAULT_TEMPLATE_FILENAME);
+      notify('Template downloaded.', 'success');
+    },
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: () => validateTable(table.getExportRows()),
+    onMutate: () => table.setValidating(),
+    onSuccess: (raw) => {
+      const { isValid, errorCount } = table.applyValidationResult(raw);
+      if (isValid) {
+        notify('Validation passed — all cells are valid.', 'success');
+      } else {
+        notify(
+          `Validation failed: ${errorCount} invalid cell(s). Hover the red cells for details.`,
+          'error',
+          7000,
+        );
       }
     },
-    [notify],
-  );
+  });
 
-  // --- Action handlers ------------------------------------------------------
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadExcel(table.getExportRows(), title || undefined),
+    onSuccess: ({ blob }) => {
+      saveBlob(blob, toExcelFilename(title));
+      notify('Excel file downloaded.', 'success');
+    },
+  });
 
-  const handleUpload = useCallback(
-    (file: File) =>
-      runAction(async () => {
-        const { rows: rawRows, columns } = await uploadExcel(file);
+  const emailMutation = useMutation({
+    mutationFn: (params: EmailParams) =>
+      sendEmailReport({ ...params, rows: table.getExportRows(), title: title || undefined }),
+    onSuccess: (_data, params) => {
+      notify(`Report sent to ${params.recipient}.`, 'success');
+      setEmailOpen(false);
+    },
+  });
 
-        // Reject files whose columns don't match the expected schema, with an
-        // explanation. (Cell *values* are NOT checked here — a file with the
-        // right columns but bad values still imports and fails validation.)
-        const { missing, unknownHeaders } = inspectUploadColumns(rawRows, columns);
-        if (missing.length > 0) {
-          const expected = COLUMNS.map((c) => c.label).join(', ');
-          const miss = missing.map((c) => c.label).join(', ');
-          throw new Error(
-            `Upload failed — the file's columns don't match. ` +
-              `Missing required column(s): ${miss}. Expected columns: ${expected}.`,
-          );
-        }
-
-        table.loadUploadedRows(rawRows);
-        let msg = `Loaded ${rawRows.length} row(s) from “${file.name}”. Please validate.`;
-        if (unknownHeaders.length > 0) {
-          msg += ` (Ignored unrecognized column(s): ${unknownHeaders.join(', ')}.)`;
-        }
-        notify(msg, 'success');
-      }),
-    [runAction, table, notify],
-  );
-
-  const handleDownloadTemplate = useCallback(
-    () =>
-      runAction(async () => {
-        const { blob, filename } = await apiDownloadTemplate();
-        saveBlob(blob, filename || DEFAULT_TEMPLATE_FILENAME);
-        notify('Template downloaded.', 'success');
-      }),
-    [runAction, notify],
-  );
-
-  const handleValidate = useCallback(
-    () =>
-      runAction(async () => {
-        const { isValid, errorCount } = await table.validate();
-        if (isValid) {
-          notify('Validation passed — all cells are valid.', 'success');
-        } else {
-          notify(
-            `Validation failed: ${errorCount} invalid cell(s). Hover the red cells for details.`,
-            'error',
-            7000,
-          );
-        }
-      }),
-    [runAction, table, notify],
-  );
-
-  const handleDownloadExcel = useCallback(
-    () =>
-      runAction(async () => {
-        const title = sheetTitle.trim();
-        const { blob } = await table.downloadExcel(title || undefined);
-        // The user's title is the name of the file.
-        saveBlob(blob, toExcelFilename(title));
-        notify('Excel file downloaded.', 'success');
-      }),
-    [runAction, table, notify, sheetTitle],
-  );
-
-  const handleSendEmail = useCallback(
-    ({ recipient, subject, message }: EmailParams) =>
-      runAction(async () => {
-        setSending(true);
-        try {
-          await table.sendEmail({ recipient, subject, message, title: sheetTitle.trim() || undefined });
-          notify(`Report sent to ${recipient}.`, 'success');
-          setEmailOpen(false);
-        } finally {
-          setSending(false);
-        }
-      }),
-    [runAction, table, notify, sheetTitle],
-  );
+  // Any in-flight action blocks the toolbar.
+  const busy =
+    schemaQuery.isLoading ||
+    uploadMutation.isPending ||
+    templateMutation.isPending ||
+    validateMutation.isPending ||
+    downloadMutation.isPending ||
+    emailMutation.isPending;
 
   // --- Render ---------------------------------------------------------------
 
@@ -167,12 +149,13 @@ export default function HomePage() {
         </Link>
       </header>
 
-      {schemaError && (
+      {schemaQuery.isError && (
         <div className="status-banner status-banner--warning" role="status">
           <span className="status-banner__dot" aria-hidden="true" />
           <span>
-            Could not load dropdown options ({schemaError}).{' '}
-            <button type="button" className="link-btn" onClick={() => void reload()}>
+            Could not load dropdown options (
+            {schemaQuery.error instanceof Error ? schemaQuery.error.message : 'error'}).{' '}
+            <button type="button" className="link-btn" onClick={() => void schemaQuery.refetch()}>
               Retry
             </button>
           </span>
@@ -191,18 +174,19 @@ export default function HomePage() {
           />
         </label>
         <span className="sheet-title-hint">
-          Used as the downloaded file name{sheetTitle.trim() ? ` (${toExcelFilename(sheetTitle.trim())})` : ''} and the email report.
+          Used as the downloaded file name{title ? ` (${toExcelFilename(title)})` : ''} and the
+          email report.
         </span>
       </div>
 
       <Toolbar
         canExport={table.canExport}
-        busy={busy || schemaLoading}
-        onUploadFile={handleUpload}
+        busy={busy}
+        onUploadFile={(file) => uploadMutation.mutate(file)}
         onAddRow={table.addRow}
-        onDownloadTemplate={handleDownloadTemplate}
-        onValidate={handleValidate}
-        onDownloadExcel={handleDownloadExcel}
+        onDownloadTemplate={() => templateMutation.mutate()}
+        onValidate={() => validateMutation.mutate()}
+        onDownloadExcel={() => downloadMutation.mutate()}
         onOpenEmail={() => setEmailOpen(true)}
       />
 
@@ -215,7 +199,7 @@ export default function HomePage() {
       <DataGrid
         rows={table.rows}
         errorsById={table.errorsById}
-        schemaOptions={schemaOptions}
+        schemaOptions={schemaQuery.data ?? {}}
         onCellChange={table.updateCell}
         onDeleteRow={table.deleteRow}
       />
@@ -231,14 +215,12 @@ export default function HomePage() {
       <EmailDialog
         open={emailOpen}
         defaultRecipient={DEFAULT_MANAGER_EMAIL}
-        defaultSubject={sheetTitle.trim() || undefined}
+        defaultSubject={title || undefined}
         rowCount={exportRowCount}
-        sending={sending}
-        onClose={() => (sending ? null : setEmailOpen(false))}
-        onSend={handleSendEmail}
+        sending={emailMutation.isPending}
+        onClose={() => (emailMutation.isPending ? null : setEmailOpen(false))}
+        onSend={(params) => emailMutation.mutate(params)}
       />
-
-      <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

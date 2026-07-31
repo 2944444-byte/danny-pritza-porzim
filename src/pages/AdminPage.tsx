@@ -12,57 +12,40 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  fetchSchedule,
-  fetchAvailability,
-  saveSchedule,
-  fetchOffices,
-  saveOffices,
-} from '../api/phoneMappingApi';
-import { ToastStack } from '../components/Toast';
-import { useToasts } from '../hooks/useToasts';
-import type { Availability, DaySchedule, Schedule } from '../types';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { saveSchedule, saveOffices } from '../api/phoneMappingApi';
+import { useScheduleQuery, useOfficesQuery, useAvailabilityQuery } from '../hooks/queries';
+import { queryKeys } from '../lib/queryClient';
+import { notify } from '../lib/notify';
+import type { DaySchedule, Schedule } from '../types';
 
 // 0 = Sunday … 6 = Saturday (matches the backend's day keys).
 const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ADMIN_TOKEN_STORAGE_KEY = 'phoneMapping.adminToken';
 
 export default function AdminPage() {
-  const { toasts, notify, dismiss } = useToasts();
+  const queryClient = useQueryClient();
+  const scheduleQuery = useScheduleQuery();
+  const officesQuery = useOfficesQuery();
+  const availabilityQuery = useAvailabilityQuery();
+
+  // Editable local copies, seeded from the queries once they load.
   const [schedule, setSchedule] = useState<Schedule | null>(null);
-  const [availability, setAvailability] = useState<Availability | null>(null);
   const [offices, setOffices] = useState<string[]>([]);
   const [adminToken, setAdminToken] = useState<string>(
     () => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '',
   );
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [savingOffices, setSavingOffices] = useState(false);
 
-  // Load the schedule, offices and current status on mount.
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [sched, avail, offs] = await Promise.all([
-          fetchSchedule(),
-          fetchAvailability(),
-          fetchOffices(),
-        ]);
-        if (!active) return;
-        setSchedule(sched);
-        setAvailability(avail);
-        setOffices(offs);
-      } catch (e) {
-        notify(e instanceof Error ? e.message : 'Failed to load admin settings.', 'error', 7000);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [notify]);
+    if (scheduleQuery.data) setSchedule(scheduleQuery.data);
+  }, [scheduleQuery.data]);
+  useEffect(() => {
+    if (officesQuery.data) setOffices(officesQuery.data);
+  }, [officesQuery.data]);
+
+  const loading = scheduleQuery.isLoading || officesQuery.isLoading;
+  const availability = availabilityQuery.data ?? null;
+  const persistToken = () => localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
 
   // --- Offices editor ---
   const updateOffice = (index: number, value: string) =>
@@ -70,23 +53,6 @@ export default function AdminPage() {
   const addOffice = () => setOffices((prev) => [...prev, '']);
   const removeOffice = (index: number) =>
     setOffices((prev) => prev.filter((_, i) => i !== index));
-
-  const persistToken = () => localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
-
-  const handleSaveOffices = async () => {
-    setSavingOffices(true);
-    try {
-      const cleaned = offices.map((o) => o.trim()).filter(Boolean);
-      const saved = await saveOffices(cleaned, adminToken || undefined);
-      persistToken();
-      setOffices(saved);
-      notify('Offices saved.', 'success');
-    } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save offices.', 'error', 7000);
-    } finally {
-      setSavingOffices(false);
-    }
-  };
 
   const updateDay = (dayKey: string, patch: Partial<DaySchedule>) => {
     setSchedule((prev) =>
@@ -96,22 +62,37 @@ export default function AdminPage() {
     );
   };
 
-  const handleSave = async () => {
-    if (!schedule) return;
-    setSaving(true);
-    try {
-      const saved = await saveSchedule(schedule, adminToken || undefined);
-      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken);
+  // --- Mutations (invalidate the relevant queries on success) ---
+  const scheduleMutation = useMutation({
+    mutationFn: (next: Schedule) => saveSchedule(next, adminToken || undefined),
+    onSuccess: (saved) => {
+      persistToken();
       setSchedule(saved);
-      // Refresh the live status after saving.
-      setAvailability(await fetchAvailability());
+      queryClient.invalidateQueries({ queryKey: queryKeys.schedule });
+      queryClient.invalidateQueries({ queryKey: queryKeys.availability });
       notify('Schedule saved.', 'success');
-    } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save schedule.', 'error', 7000);
-    } finally {
-      setSaving(false);
-    }
+    },
+  });
+
+  const officesMutation = useMutation({
+    mutationFn: (next: string[]) => saveOffices(next, adminToken || undefined),
+    onSuccess: (saved) => {
+      persistToken();
+      setOffices(saved);
+      queryClient.invalidateQueries({ queryKey: queryKeys.offices });
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemaMeta });
+      notify('Offices saved.', 'success');
+    },
+  });
+
+  const handleSave = () => {
+    if (schedule) scheduleMutation.mutate(schedule);
   };
+  const handleSaveOffices = () =>
+    officesMutation.mutate(offices.map((o) => o.trim()).filter(Boolean));
+
+  const saving = scheduleMutation.isPending;
+  const savingOffices = officesMutation.isPending;
 
   const statusLabel = useMemo(() => {
     if (!availability) return null;
@@ -295,8 +276,6 @@ export default function AdminPage() {
           </section>
         </>
       )}
-
-      <ToastStack toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }

@@ -15,24 +15,10 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import {
-  validateTable,
-  downloadExcel as apiDownloadExcel,
-  sendEmailReport as apiSendEmail,
-} from '../api/phoneMappingApi';
 import { createEmptyRow, toGridRow, toBackendRows } from '../utils/rowFactory';
 import { normalizeUploadedRows } from '../utils/uploadNormalizer';
 import { normalizeValidation, pruneUnknownColumns } from '../utils/validationAdapter';
-import type {
-  BlobResult,
-} from '../api/client';
-import type {
-  CellErrorsById,
-  CellValue,
-  EmailParams,
-  GridRow,
-  ValidationStatus,
-} from '../types';
+import type { BackendRow, CellErrorsById, CellValue, GridRow, ValidationStatus } from '../types';
 
 export const STATUS = {
   UNVALIDATED: 'unvalidated',
@@ -53,9 +39,12 @@ export interface UsePhoneTableResult {
   updateCell: (rowId: string, columnKey: string, value: CellValue) => void;
   setRows: (next: GridRow[]) => void;
   loadUploadedRows: (rawRows: Array<Record<string, unknown>>) => void;
-  validate: () => Promise<{ isValid: boolean; errorCount: number }>;
-  downloadExcel: (title?: string) => Promise<BlobResult>;
-  sendEmail: (params: EmailParams & { title?: string }) => Promise<unknown>;
+  /** Rows without UI-only fields, ready to POST to the backend. */
+  getExportRows: () => BackendRow[];
+  /** Mark the table as validating (call when a validate request starts). */
+  setValidating: () => void;
+  /** Apply a raw /validate-table response: paint red cells + set status. */
+  applyValidationResult: (raw: unknown) => { isValid: boolean; errorCount: number };
 }
 
 export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult {
@@ -135,51 +124,31 @@ export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult 
   );
 
   // --- Validation -----------------------------------------------------------
-
-  const validate = useCallback(async () => {
-    setStatus(STATUS.VALIDATING);
-    const orderedRows = rows; // snapshot: index → _id mapping for this run
-    const payload = toBackendRows(orderedRows);
-
-    const raw = await validateTable(payload);
-    const normalized = pruneUnknownColumns(normalizeValidation(raw));
-
-    // Translate index-keyed errors onto stable row ids.
-    const byId: CellErrorsById = {};
-    for (const [indexStr, cols] of Object.entries(normalized.cellErrors)) {
-      const row = orderedRows[Number(indexStr)];
-      if (row) byId[row._id] = cols;
-    }
-
-    setErrorsById(byId);
-    setStatus(normalized.isValid ? STATUS.VALID : STATUS.INVALID);
-    return { isValid: normalized.isValid, errorCount: normalized.errorCount };
-  }, [rows]);
-
-  // --- Export / email (guarded by validation) -------------------------------
-
-  const ensureValidated = useCallback(() => {
-    if (status !== STATUS.VALID) {
-      throw new Error('Please validate the data successfully before exporting.');
-    }
-  }, [status]);
+  // Network requests live in TanStack Query mutations (see HomePage); this hook
+  // only owns state. The component marks the table validating, then applies the
+  // raw /validate-table response here.
 
   const getExportRows = useCallback(() => toBackendRows(rows), [rows]);
 
-  const downloadExcel = useCallback(
-    async (title?: string) => {
-      ensureValidated();
-      return apiDownloadExcel(getExportRows(), title);
-    },
-    [ensureValidated, getExportRows],
-  );
+  const setValidating = useCallback(() => setStatus(STATUS.VALIDATING), []);
 
-  const sendEmail = useCallback(
-    async ({ recipient, subject, message, title }: EmailParams & { title?: string }) => {
-      ensureValidated();
-      return apiSendEmail({ recipient, rows: getExportRows(), subject, message, title });
+  const applyValidationResult = useCallback(
+    (raw: unknown) => {
+      const orderedRows = rows; // rows can't change mid-request (UI is busy)
+      const normalized = pruneUnknownColumns(normalizeValidation(raw));
+
+      // Translate index-keyed errors onto stable row ids.
+      const byId: CellErrorsById = {};
+      for (const [indexStr, cols] of Object.entries(normalized.cellErrors)) {
+        const row = orderedRows[Number(indexStr)];
+        if (row) byId[row._id] = cols;
+      }
+
+      setErrorsById(byId);
+      setStatus(normalized.isValid ? STATUS.VALID : STATUS.INVALID);
+      return { isValid: normalized.isValid, errorCount: normalized.errorCount };
     },
-    [ensureValidated, getExportRows],
+    [rows],
   );
 
   // --- Derived state --------------------------------------------------------
@@ -208,8 +177,8 @@ export function usePhoneTable(initialRows: GridRow[] = []): UsePhoneTableResult 
     updateCell,
     setRows,
     loadUploadedRows,
-    validate,
-    downloadExcel,
-    sendEmail,
+    getExportRows,
+    setValidating,
+    applyValidationResult,
   };
 }

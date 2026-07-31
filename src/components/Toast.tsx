@@ -1,18 +1,15 @@
 /**
  * Toast.tsx
  * -----------------------------------------------------------------------------
- * Presentational toast stack. State is owned by the `useToasts` hook
- * (src/hooks/useToasts.ts); this component only renders the active toasts.
+ * Presentational toast stack. Reads the active toasts from the app-wide
+ * notification store (src/lib/notify.ts) and is mounted once at the app root, so
+ * notifications appear on every route.
  */
 
-import type { ToastItem } from '../types';
+import { useToasts, dismiss } from '../lib/notify';
 
-export interface ToastStackProps {
-  toasts: ToastItem[];
-  onDismiss: (id: number) => void;
-}
-
-export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
+export function ToastStack() {
+  const toasts = useToasts();
   return (
     <div className="toast-stack" aria-live="assertive">
       {toasts.map((t) => (
@@ -22,7 +19,7 @@ export function ToastStack({ toasts, onDismiss }: ToastStackProps) {
             type="button"
             className="toast__close"
             aria-label="Dismiss notification"
-            onClick={() => onDismiss(t.id)}
+            onClick={() => dismiss(t.id)}
           >
             ✕
           </button>

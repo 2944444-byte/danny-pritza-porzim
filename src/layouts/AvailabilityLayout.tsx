@@ -11,12 +11,12 @@
 
 import { Outlet, useNavigate } from 'react-router-dom';
 import { ClosedPage } from '../components/ClosedPage';
-import { useAvailability } from '../hooks/useAvailability';
+import { useAvailabilityQuery } from '../hooks/queries';
 
 const DEFAULT_CLOSED_MESSAGE = 'אנחנו סגורים כרגע, נסו מאוחר יותר';
 
 export default function AvailabilityLayout() {
-  const { availability, loading, reload } = useAvailability();
+  const { data: availability, isLoading: loading, refetch } = useAvailabilityQuery();
   const navigate = useNavigate();
 
   if (loading && !availability) {
@@ -31,7 +31,7 @@ export default function AvailabilityLayout() {
     return (
       <ClosedPage
         message={availability.message ?? DEFAULT_CLOSED_MESSAGE}
-        onRetry={() => void reload()}
+        onRetry={() => void refetch()}
         onAdmin={() => navigate('/admin')}
       />
     );
